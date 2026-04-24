@@ -9,7 +9,7 @@ use tokio::sync::Mutex;
 /// `active_session` holds the id of the in-flight session, if any. It is set
 /// by `dkod_execute_begin`, cleared by `dkod_abort` and a successful
 /// `dkod_pr`. Fresh processes recover it by scanning `.dkod/sessions/` for a
-/// manifest with status `Executing` (see `recovery.rs`).
+/// manifest with status `Executing` (rebuilt from disk at startup, implemented in M2-3).
 pub struct ServerCtx {
     pub repo_root: PathBuf,
     pub paths: Paths,
@@ -37,5 +37,32 @@ impl ServerCtx {
         map.entry(abs_path.to_path_buf())
             .or_insert_with(|| Arc::new(Mutex::new(())))
             .clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[tokio::test]
+    async fn file_lock_returns_same_arc_for_same_path() {
+        let tmp = tempfile::tempdir().unwrap();
+        let ctx = ServerCtx::new(tmp.path());
+        let a = ctx.file_lock(Path::new("/tmp/x")).await;
+        let b = ctx.file_lock(Path::new("/tmp/x")).await;
+        assert!(Arc::ptr_eq(&a, &b), "same path should share a lock");
+    }
+
+    #[tokio::test]
+    async fn file_lock_returns_distinct_arcs_for_different_paths() {
+        let tmp = tempfile::tempdir().unwrap();
+        let ctx = ServerCtx::new(tmp.path());
+        let a = ctx.file_lock(Path::new("/tmp/x")).await;
+        let b = ctx.file_lock(Path::new("/tmp/y")).await;
+        assert!(
+            !Arc::ptr_eq(&a, &b),
+            "different paths should have distinct locks"
+        );
     }
 }

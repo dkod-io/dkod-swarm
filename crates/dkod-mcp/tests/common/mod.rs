@@ -24,6 +24,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 
+/// Buffer size for the in-memory duplex connecting the test client and
+/// server. 64 KiB is large enough for a full MCP initialize handshake
+/// without fragmentation.
+const DUPLEX_BUF_BYTES: usize = 64 * 1024;
+
 /// Initialise a fresh git repo in a tempdir, seed one commit on `main`
 /// with `tests/fixtures/tiny_rust/src/lib.rs`, and return the repo path.
 pub fn init_tempo_repo() -> (tempfile::TempDir, PathBuf) {
@@ -59,12 +64,14 @@ pub async fn spawn_in_process_server(
     // rmcp supports arbitrary `AsyncRead + AsyncWrite` transports; a pair of
     // `tokio::io::duplex` streams gives us an in-process client/server link
     // without touching real stdio. Confirmed by the rmcp-1.5 probe.
-    let (client_io, server_io) = tokio::io::duplex(64 * 1024);
+    let (client_io, server_io) = tokio::io::duplex(DUPLEX_BUF_BYTES);
     let ctx = Arc::new(ServerCtx::new(repo_root));
     let server = McpServer::new(ctx);
     tokio::spawn(async move {
         let svc = server.serve(server_io).await.expect("server serve");
-        svc.waiting().await.ok();
+        if let Err(e) = svc.waiting().await {
+            eprintln!("dkod-mcp test server exited with error: {e:?}");
+        }
     });
     ().into_dyn()
         .serve(client_io)
