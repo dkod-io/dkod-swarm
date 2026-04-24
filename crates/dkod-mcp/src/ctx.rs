@@ -1,4 +1,5 @@
-use dkod_worktree::{Paths, SessionId};
+use crate::{Error, Result};
+use dkod_worktree::{Config, Paths, SessionId};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -48,6 +49,30 @@ impl ServerCtx {
         map.entry(abs_path.to_path_buf())
             .or_insert_with(|| Arc::new(Mutex::new(())))
             .clone()
+    }
+
+    /// Return the name of the repo's main branch.
+    ///
+    /// Prefers `.dkod/config.toml::main_branch` (written by `init_repo` while
+    /// HEAD was on the true default) over `branch::detect_main`, because
+    /// `detect_main`'s tier 1 returns the currently-checked-out branch — and
+    /// after `execute_begin` that is the dk-branch, which is the wrong answer
+    /// for `abort` / `commit` / `pr` callers.
+    ///
+    /// Falls back to `branch::detect_main` if the config file is absent
+    /// (e.g. in a test repo that never ran `init_repo`). Any other error
+    /// reading the config (malformed TOML, bad permissions) propagates.
+    pub fn resolve_main(&self) -> Result<String> {
+        let config_path = self.paths.config();
+        match Config::load(&config_path) {
+            Ok(cfg) => Ok(cfg.main_branch),
+            Err(dkod_worktree::Error::Io { source, .. })
+                if source.kind() == std::io::ErrorKind::NotFound =>
+            {
+                dkod_worktree::branch::detect_main(&self.repo_root).map_err(Error::from)
+            }
+            Err(e) => Err(Error::from(e)),
+        }
     }
 }
 

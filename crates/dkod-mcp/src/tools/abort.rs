@@ -7,13 +7,17 @@
 
 use crate::schema::AbortResponse;
 use crate::{Error, Result, ServerCtx};
-use dkod_worktree::{Config, Manifest, SessionStatus, branch};
+use dkod_worktree::{Manifest, SessionStatus, branch};
 
 pub async fn abort(ctx: &ServerCtx) -> Result<AbortResponse> {
-    // Take the guard for the whole body so a concurrent `execute_begin`
-    // cannot observe a half-aborted state (branch gone, session field
-    // still set).
+    // Acquire BOTH guards up front so no other task can observe an
+    // intermediate state where the branch is gone but `active_session` is
+    // still set, or where a future writer sees "no active session" and
+    // re-acquires a file lock from `ServerCtx`. Ordering: `active_session`
+    // first, then `file_locks`, to match the acquisition order used by
+    // other paths and avoid a deadlock.
     let mut active = ctx.active_session.lock().await;
+    let mut locks = ctx.file_locks.lock().await;
     let sid = active.as_ref().ok_or(Error::NoActiveSession)?.clone();
 
     // Prefer the main-branch name recorded in `.dkod/config.toml` at
@@ -21,39 +25,24 @@ pub async fn abort(ctx: &ServerCtx) -> Result<AbortResponse> {
     // HEAD is currently the dk-branch (tier 1 of the detection walk
     // reflects HEAD) — calling destroy with that as "main" would try to
     // check out, then delete, the very branch we are on.
-    let main = resolve_main(ctx)?;
+    let main = ctx.resolve_main()?;
     branch::destroy_dk_branch(&ctx.repo_root, &main, sid.as_str())?;
 
-    // Mark the manifest `Aborted` so restart-recovery won't re-adopt this
-    // session. A missing / corrupt manifest is tolerated — the branch is
-    // already gone, so there is nothing left to recover.
+    // Tolerate a missing / malformed manifest — the in-memory state must
+    // still be cleared so a retried abort isn't left in a zombie state.
     if let Ok(mut m) = Manifest::load(&ctx.paths, &sid) {
         m.status = SessionStatus::Aborted;
         m.save(&ctx.paths)?;
     }
 
+    // Clear file locks BEFORE clearing `active_session`. Clearing locks
+    // after clearing active would leave a TOCTOU window: a future M2-4
+    // writer could observe "no active session", create a fresh lock in
+    // `ServerCtx`, and then have it wiped out by the clear() below.
+    locks.clear();
     *active = None;
-    // Drop any file locks held for this session. `write_symbol` (lands in
-    // M2-4) populates this table; clearing it here means a later session
-    // starts with a clean slate and never contends with a stale `Arc`.
-    ctx.file_locks.lock().await.clear();
 
     Ok(AbortResponse {
         session_id: sid.to_string(),
     })
-}
-
-/// Resolve the repo's `main` branch name for abort/commit purposes.
-///
-/// Reads `.dkod/config.toml` first — that value was recorded by `init_repo`
-/// while HEAD was on the default branch, so it is trustworthy even after
-/// `execute_begin` checks out `dk/<sid>`. Falls back to
-/// `branch::detect_main` if the config file is missing (e.g. in tests that
-/// bypass `init_repo`) — the fallback is inaccurate while HEAD is on a
-/// dk-branch, but we surface it rather than refuse the abort.
-pub(crate) fn resolve_main(ctx: &ServerCtx) -> Result<String> {
-    match Config::load(&ctx.paths.config()) {
-        Ok(cfg) => Ok(cfg.main_branch),
-        Err(_) => Ok(branch::detect_main(&ctx.repo_root)?),
-    }
 }

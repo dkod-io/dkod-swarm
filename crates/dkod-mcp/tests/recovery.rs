@@ -75,3 +75,14 @@ async fn fresh_ctx_with_no_sessions_is_noop() {
     ctx.recover().await.expect("recover on empty .dkod is ok");
     assert!(ctx.active_session.lock().await.is_none());
 }
+
+#[test]
+fn resolve_main_falls_back_to_detect_main_when_config_missing() {
+    let (_tmp, root) = common::init_tempo_repo();
+    // Delete the config file written by `init_repo`; scan should now read
+    // from `branch::detect_main`, which in a fresh repo with HEAD on
+    // `main` returns `"main"`.
+    std::fs::remove_file(root.join(".dkod/config.toml")).unwrap();
+    let ctx = dkod_mcp::ServerCtx::new(&root);
+    assert_eq!(ctx.resolve_main().unwrap(), "main");
+}

@@ -11,11 +11,15 @@ use dkod_worktree::{Manifest, Paths, SessionId, SessionStatus};
 /// Scan `.dkod/sessions/<id>/manifest.json` and return the id of the first
 /// session whose status is `Executing`. `None` if no such session exists.
 ///
+/// Deterministic: entries are sorted by session-id file name before the
+/// scan, so the "first Executing session found" is stable across
+/// filesystems. `SessionId`'s `sess-<hex-ts>-<hex-ctr>` form means a
+/// lexicographic sort is close to chronological.
+///
 /// If multiple executing sessions are found (should never happen in
 /// practice — it would only occur from external tampering), returns the
-/// first one encountered in directory-scan order. The orchestrator
-/// invariant is "at most one active session per repo"; violating it is
-/// caller error.
+/// lexicographically-first one. The orchestrator invariant is "at most
+/// one active session per repo"; violating it is caller error.
 ///
 /// Corrupt or mid-write manifests are silently skipped: recovery is
 /// best-effort, and a truncated JSON blob is indistinguishable from a
@@ -31,8 +35,14 @@ pub fn scan_executing_session(paths: &Paths) -> Result<Option<SessionId>> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(e) => return Err(Error::Io(e)),
     };
-    for entry in rd {
-        let entry = entry.map_err(Error::Io)?;
+
+    // Collect and sort by file name so the "first Executing session found"
+    // is deterministic across filesystems; SessionId's `sess-<hex-ts>-<ctr>`
+    // form means lex sort is close to chronological.
+    let mut entries: Vec<_> = rd.collect::<std::io::Result<Vec<_>>>().map_err(Error::Io)?;
+    entries.sort_by_key(|e| e.file_name());
+
+    for entry in entries {
         let ft = entry.file_type().map_err(Error::Io)?;
         if !ft.is_dir() {
             continue;
@@ -46,8 +56,7 @@ pub fn scan_executing_session(paths: &Paths) -> Result<Option<SessionId>> {
             Ok(m) if matches!(m.status, SessionStatus::Executing) => {
                 return Ok(Some(sid));
             }
-            Ok(_) => {}
-            Err(_) => {
+            Ok(_) | Err(_) => {
                 // Corrupt or mid-write manifests are skipped — recovery is
                 // best-effort. A future `dkod status` surface can surface
                 // these for operator attention.
