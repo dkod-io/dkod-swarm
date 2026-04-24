@@ -6,6 +6,7 @@
 //! fallible. Confirmed by `examples/probe_engine_api.rs`.
 
 pub mod callgraph;
+pub mod commit;
 pub mod error;
 pub mod partition;
 pub mod replace;
