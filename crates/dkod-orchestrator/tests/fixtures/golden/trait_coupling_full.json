@@ -1,0 +1,82 @@
+{
+  "groups": [
+    {
+      "id": "g1",
+      "symbols": [
+        {
+          "qualified_name": "impl Greeter for French",
+          "file_path": "tests/fixtures/trait_coupling/src/lib.rs",
+          "kind": "impl"
+        }
+      ]
+    },
+    {
+      "id": "g2",
+      "symbols": [
+        {
+          "qualified_name": "English",
+          "file_path": "tests/fixtures/trait_coupling/src/lib.rs",
+          "kind": "struct"
+        }
+      ]
+    },
+    {
+      "id": "g3",
+      "symbols": [
+        {
+          "qualified_name": "Greeter",
+          "file_path": "tests/fixtures/trait_coupling/src/lib.rs",
+          "kind": "trait"
+        }
+      ]
+    },
+    {
+      "id": "g4",
+      "symbols": [
+        {
+          "qualified_name": "greet",
+          "file_path": "tests/fixtures/trait_coupling/src/lib.rs",
+          "kind": "function"
+        },
+        {
+          "qualified_name": "say_english",
+          "file_path": "tests/fixtures/trait_coupling/src/lib.rs",
+          "kind": "function"
+        },
+        {
+          "qualified_name": "say_french",
+          "file_path": "tests/fixtures/trait_coupling/src/lib.rs",
+          "kind": "function"
+        }
+      ]
+    },
+    {
+      "id": "g5",
+      "symbols": [
+        {
+          "qualified_name": "impl Greeter for English",
+          "file_path": "tests/fixtures/trait_coupling/src/lib.rs",
+          "kind": "impl"
+        }
+      ]
+    },
+    {
+      "id": "g6",
+      "symbols": [
+        {
+          "qualified_name": "French",
+          "file_path": "tests/fixtures/trait_coupling/src/lib.rs",
+          "kind": "struct"
+        }
+      ]
+    }
+  ],
+  "warnings": [
+    {
+      "MoreGroupsThanTarget": {
+        "target": 4,
+        "got": 6
+      }
+    }
+  ]
+}
