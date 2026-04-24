@@ -3,7 +3,7 @@ use crate::{Error, Result};
 use dk_core::SymbolId;
 use dkod_worktree::SymbolRef;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 /// Warnings produced alongside a partition result.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -137,18 +137,21 @@ pub fn partition(
     }
 
     // ── Group by representative ───────────────────────────────────────────
-    // BTreeMap for deterministic iteration order across runs.
-    let mut buckets: BTreeMap<SymbolId, Vec<SymbolId>> = BTreeMap::new();
+    // Bucket by UF root. SymbolId ordering is not stable across runs
+    // (engine-allocated UUIDs), so we bucket into a HashMap and then sort the
+    // resulting groups by a stable key derived from the symbols themselves.
+    let mut buckets: HashMap<SymbolId, Vec<SymbolId>> = HashMap::new();
     for id in &resolved {
         let root = uf.find(id);
         buckets.entry(root).or_default().push(*id);
     }
 
-    let groups: Vec<Group> = buckets
+    // Materialise each bucket into a `Group` (symbols sorted by
+    // qualified_name), then order the groups themselves by the qualified_name
+    // of their first symbol — stable across engine UUID allocations.
+    let mut groups: Vec<Group> = buckets
         .into_values()
-        .enumerate()
-        .map(|(i, members)| {
-            let gid = format!("g{}", i + 1);
+        .map(|members| {
             let mut symbols: Vec<SymbolRef> = members
                 .iter()
                 .filter_map(|sid| graph.symbol(sid))
@@ -159,11 +162,22 @@ pub fn partition(
                     kind: s.kind.to_string(),
                 })
                 .collect();
-            // Stable ordering within a group.
             symbols.sort_by(|a, b| a.qualified_name.cmp(&b.qualified_name));
-            Group { id: gid, symbols }
+            Group {
+                // Temporary placeholder; assigned after stable sort below.
+                id: String::new(),
+                symbols,
+            }
         })
         .collect();
+    groups.sort_by(|a, b| {
+        a.symbols[0]
+            .qualified_name
+            .cmp(&b.symbols[0].qualified_name)
+    });
+    for (i, g) in groups.iter_mut().enumerate() {
+        g.id = format!("g{}", i + 1);
+    }
 
     // ── Target-count warnings ─────────────────────────────────────────────
     match groups.len().cmp(&target_groups) {

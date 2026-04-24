@@ -4,9 +4,9 @@
       "id": "g1",
       "symbols": [
         {
-          "qualified_name": "impl Greeter for French",
+          "qualified_name": "English",
           "file_path": "tests/fixtures/trait_coupling/src/lib.rs",
-          "kind": "impl"
+          "kind": "struct"
         }
       ]
     },
@@ -14,7 +14,7 @@
       "id": "g2",
       "symbols": [
         {
-          "qualified_name": "English",
+          "qualified_name": "French",
           "file_path": "tests/fixtures/trait_coupling/src/lib.rs",
           "kind": "struct"
         }
@@ -64,9 +64,9 @@
       "id": "g6",
       "symbols": [
         {
-          "qualified_name": "French",
+          "qualified_name": "impl Greeter for French",
           "file_path": "tests/fixtures/trait_coupling/src/lib.rs",
-          "kind": "struct"
+          "kind": "impl"
         }
       ]
     }

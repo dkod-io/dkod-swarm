@@ -4,7 +4,7 @@
       "id": "g1",
       "symbols": [
         {
-          "qualified_name": "delta",
+          "qualified_name": "alpha",
           "file_path": "tests/fixtures/basic/src/lib.rs",
           "kind": "function"
         }
@@ -14,7 +14,7 @@
       "id": "g2",
       "symbols": [
         {
-          "qualified_name": "gamma",
+          "qualified_name": "beta",
           "file_path": "tests/fixtures/basic/src/lib.rs",
           "kind": "function"
         }
@@ -24,7 +24,7 @@
       "id": "g3",
       "symbols": [
         {
-          "qualified_name": "alpha",
+          "qualified_name": "delta",
           "file_path": "tests/fixtures/basic/src/lib.rs",
           "kind": "function"
         }
@@ -34,7 +34,7 @@
       "id": "g4",
       "symbols": [
         {
-          "qualified_name": "beta",
+          "qualified_name": "gamma",
           "file_path": "tests/fixtures/basic/src/lib.rs",
           "kind": "function"
         }
