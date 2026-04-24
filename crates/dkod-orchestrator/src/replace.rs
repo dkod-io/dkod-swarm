@@ -35,14 +35,22 @@ pub enum ReplaceOutcome {
 
 /// Replace a symbol's source span with `new_body_source`.
 ///
-/// `qualified_name` is matched against `Symbol.qualified_name` first, then
-/// against `Symbol.name` so callers can use short names when the file has no
-/// module-prefix ambiguity.
+/// Resolution is two-tiered:
+///
+/// 1. Try an exact match on `Symbol.qualified_name` (what most callers pass
+///    after consulting the partitioner).
+/// 2. Otherwise, try to match on the short `Symbol.name`. If **exactly one**
+///    symbol has that short name, use it. If more than one does — e.g.
+///    `greet` appears on both `impl Greeter for English` and
+///    `impl Greeter for French` — return [`Error::InvalidPartition`] with
+///    the candidate qualified_names so the caller can disambiguate.
 ///
 /// # Errors
 ///
 /// - [`Error::SymbolNotFound`] – `qualified_name` not found in `current_source`
 ///   (includes the empty-name and empty-source cases).
+/// - [`Error::InvalidPartition`] – the short name is ambiguous; caller must
+///   pass one of the listed qualified_names instead.
 /// - [`Error::ReplaceFailed`] – the stored span is out of bounds (should not
 ///   happen with well-formed engine output, but checked defensively).
 /// - [`Error::Engine`] – the initial parse of `current_source` fails.
@@ -57,13 +65,31 @@ pub fn replace_symbol(
     // as SymbolNotFound below, which is the correct contract.
     let (syms, _calls) = extract_rust_file(current_source, &path)?;
 
-    let target = syms
-        .iter()
-        .find(|s| s.qualified_name == qualified_name || s.name == qualified_name)
-        .ok_or_else(|| Error::SymbolNotFound {
-            name: qualified_name.to_owned(),
-            file: path.clone(),
-        })?;
+    // Tier 1: exact qualified_name match.
+    let target = if let Some(s) = syms.iter().find(|s| s.qualified_name == qualified_name) {
+        s
+    } else {
+        // Tier 2: unique short-name match.
+        let mut short_matches = syms.iter().filter(|s| s.name == qualified_name);
+        let Some(first) = short_matches.next() else {
+            return Err(Error::SymbolNotFound {
+                name: qualified_name.to_owned(),
+                file: path.clone(),
+            });
+        };
+        if short_matches.next().is_some() {
+            let candidates: Vec<String> = syms
+                .iter()
+                .filter(|s| s.name == qualified_name)
+                .map(|s| s.qualified_name.clone())
+                .collect();
+            return Err(Error::InvalidPartition(format!(
+                "ambiguous short name {:?}; pass one of {candidates:?} as qualified_name",
+                qualified_name
+            )));
+        }
+        first
+    };
 
     let start = target.span.start_byte as usize;
     let end = target.span.end_byte as usize;

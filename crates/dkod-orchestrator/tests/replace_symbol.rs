@@ -1,4 +1,5 @@
-use dkod_orchestrator::replace::{replace_symbol, ReplaceOutcome};
+use dkod_orchestrator::Error;
+use dkod_orchestrator::replace::{ReplaceOutcome, replace_symbol};
 
 #[test]
 fn replaces_existing_function_body_cleanly() {
@@ -19,7 +20,7 @@ fn replaces_existing_function_body_cleanly() {
 fn missing_symbol_errors() {
     let src = b"pub fn hello() {}\n";
     let err = replace_symbol(src, "nope", "pub fn nope() {}").unwrap_err();
-    assert!(format!("{err}").contains("not found"), "got: {err}");
+    assert!(matches!(err, Error::SymbolNotFound { .. }), "got: {err}");
 }
 
 #[test]
@@ -43,13 +44,13 @@ pub fn c() -> i32 { 3 }
 fn empty_qualified_name_errors() {
     let src = b"pub fn hello() {}\n";
     let err = replace_symbol(src, "", "pub fn hello() {}").unwrap_err();
-    assert!(format!("{err}").contains("not found"), "got: {err}");
+    assert!(matches!(err, Error::SymbolNotFound { .. }), "got: {err}");
 }
 
 #[test]
 fn empty_source_errors_symbol_not_found() {
     let err = replace_symbol(b"", "hello", "pub fn hello() {}").unwrap_err();
-    assert!(format!("{err}").contains("not found"), "got: {err}");
+    assert!(matches!(err, Error::SymbolNotFound { .. }), "got: {err}");
 }
 
 #[test]
