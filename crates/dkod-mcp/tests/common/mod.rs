@@ -80,23 +80,43 @@ pub async fn spawn_in_process_server(
 }
 
 fn run(dir: &Path, args: &[&str]) {
-    let status = Command::new(args[0])
+    assert!(!args.is_empty(), "command args cannot be empty");
+    let output = Command::new(args[0])
         .args(&args[1..])
         .current_dir(dir)
-        .status()
+        .output()
         .unwrap();
-    assert!(status.success(), "command failed: {args:?}");
+    assert!(
+        output.status.success(),
+        "command failed: {args:?}\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
+// Fixture identity used for the seed commit of the in-memory test repo.
+// Production commits flow through `dkod_worktree::branch::commit_paths`,
+// which forces the real Haim Ari identity; the fixture seed commit is
+// never pushed anywhere and uses a reserved `.invalid` TLD per RFC 2606
+// to keep PII out of committed test code.
+const FIXTURE_GIT_NAME: &str = "dkod-swarm fixture";
+const FIXTURE_GIT_EMAIL: &str = "fixture@example.invalid";
+
 fn run_with_identity(dir: &Path, args: &[&str]) {
-    let status = Command::new(args[0])
+    assert!(!args.is_empty(), "command args cannot be empty");
+    let output = Command::new(args[0])
         .args(&args[1..])
         .current_dir(dir)
-        .env("GIT_AUTHOR_NAME", "Haim Ari")
-        .env("GIT_AUTHOR_EMAIL", "haimari1@gmail.com")
-        .env("GIT_COMMITTER_NAME", "Haim Ari")
-        .env("GIT_COMMITTER_EMAIL", "haimari1@gmail.com")
-        .status()
+        .env("GIT_AUTHOR_NAME", FIXTURE_GIT_NAME)
+        .env("GIT_AUTHOR_EMAIL", FIXTURE_GIT_EMAIL)
+        .env("GIT_COMMITTER_NAME", FIXTURE_GIT_NAME)
+        .env("GIT_COMMITTER_EMAIL", FIXTURE_GIT_EMAIL)
+        .output()
         .unwrap();
-    assert!(status.success(), "command failed: {args:?}");
+    assert!(
+        output.status.success(),
+        "command failed: {args:?}\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }

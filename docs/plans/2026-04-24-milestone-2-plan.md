@@ -41,7 +41,7 @@ Design `§MCP tool surface` lists `dkod_write_symbol(file, symbol, body)` — no
 
 New files only. Nothing under `crates/dkod-worktree/` or `crates/dkod-orchestrator/` is modified (except to export helpers already public).
 
-```
+```text
 Cargo.toml                                     # +workspace.dependencies: rmcp, tokio, schemars, async-trait, chrono
 crates/
 └── dkod-mcp/
@@ -139,7 +139,7 @@ Poller discipline per `~/.claude/memory/tools/coderabbit.md`: arm the 3-conditio
 
 # PR M2-1 — Scaffold + rmcp probe
 
-### Task 1: rmcp SDK probe
+## Task 1: rmcp SDK probe
 
 **Files:**
 - Create: `crates/dkod-mcp/Cargo.toml`
@@ -182,12 +182,9 @@ repository.workspace = true
 authors.workspace = true
 description = "Stdio MCP server exposing the 8-tool dkod-swarm surface"
 
-[lib]
-path = "src/lib.rs"
-
-[[bin]]
-name = "dkod-mcp"
-path = "src/main.rs"
+# `[lib]` and `[[bin]]` are intentionally omitted — Cargo autodiscovers
+# `src/lib.rs` and `src/main.rs`. Explicit blocks are only needed if a
+# later PR wants to customise target names or paths.
 
 [dependencies]
 dkod-worktree = { path = "../dkod-worktree" }
@@ -282,7 +279,7 @@ git commit -m "Add dkod-mcp crate scaffold + rmcp SDK probe"
 
 Docs-only? No — this touches Rust source. Run `/coderabbit:code-review` first.
 
-### Task 2: Error + ctx skeletons
+## Task 2: Error + ctx skeletons
 
 **Files:**
 - Create: `crates/dkod-mcp/src/lib.rs`
@@ -435,7 +432,7 @@ git commit -m "Add error, ctx, time skeletons for dkod-mcp"
 
 Run `/coderabbit:code-review` before the commit.
 
-### Task 3: Empty server + stdio binary
+## Task 3: Empty server + stdio binary
 
 **Files:**
 - Create: `crates/dkod-mcp/src/tools/mod.rs`
@@ -572,7 +569,7 @@ git commit -m "Add empty McpServer + stdio binary entry"
 
 Run `/coderabbit:code-review` first.
 
-### Task 4: In-process client harness (fixtures)
+## Task 4: In-process client harness (fixtures)
 
 This test harness is reused by every later PR's integration test. Build it once, well.
 
@@ -690,7 +687,7 @@ git commit -m "Add integration test harness: tiny_rust fixture + in-process clie
 
 Run `/coderabbit:code-review` first.
 
-### PR M2-1 wrap-up
+## PR M2-1 wrap-up
 
 - [ ] `cargo test --workspace` → green (existing 48 tests + new `error_smoke` + `server_ctor`).
 - [ ] Push, open PR `M2-1: dkod-mcp scaffold + rmcp probe`. Body: summary + test plan checklist.
@@ -701,7 +698,7 @@ Run `/coderabbit:code-review` first.
 
 # PR M2-2 — `dkod_plan`
 
-### Task 5: Plan request/response schema
+## Task 5: Plan request/response schema
 
 **Files:**
 - Modify: `crates/dkod-mcp/src/schema.rs`
@@ -809,7 +806,7 @@ GIT_COMMITTER_NAME="Haim Ari" GIT_COMMITTER_EMAIL="haimari1@gmail.com" \
 git commit -m "Add plan request/response schema"
 ```
 
-### Task 6: `dkod_plan` tool implementation
+## Task 6: `dkod_plan` tool implementation
 
 **Files:**
 - Create: `crates/dkod-mcp/src/tools/plan.rs`
@@ -951,7 +948,7 @@ GIT_COMMITTER_NAME="Haim Ari" GIT_COMMITTER_EMAIL="haimari1@gmail.com" \
 git commit -m "Add dkod_plan tool"
 ```
 
-### Task 7: End-to-end `dkod_plan` call via in-process client
+## Task 7: End-to-end `dkod_plan` call via in-process client
 
 **Files:**
 - Create: `crates/dkod-mcp/tests/plan_tool_e2e.rs`
@@ -1001,7 +998,7 @@ GIT_COMMITTER_NAME="Haim Ari" GIT_COMMITTER_EMAIL="haimari1@gmail.com" \
 git commit -m "Add end-to-end MCP test for dkod_plan"
 ```
 
-### PR M2-2 wrap-up
+## PR M2-2 wrap-up
 
 - [ ] `/coderabbit:code-review` clean; `cargo test --workspace` green.
 - [ ] PR `M2-2: dkod_plan tool`. Merge autonomously when CR + tests pass.
@@ -1010,7 +1007,7 @@ git commit -m "Add end-to-end MCP test for dkod_plan"
 
 # PR M2-3 — `dkod_execute_begin` + `dkod_abort`
 
-### Task 8: Execute-begin / abort schema
+## Task 8: Execute-begin / abort schema
 
 **Files:**
 - Modify: `crates/dkod-mcp/src/schema.rs` — add `ExecuteBeginRequest`, `ExecuteBeginResponse`, `GroupInput`, `SymbolRefSchema`, `AbortResponse`.
@@ -1053,7 +1050,7 @@ pub struct AbortResponse {
 }
 ```
 
-### Task 9: `dkod_execute_begin` wrapper
+## Task 9: `dkod_execute_begin` wrapper
 
 **Files:**
 - Create: `crates/dkod-mcp/src/tools/execute_begin.rs`
@@ -1210,7 +1207,7 @@ impl McpServer {
 - [ ] **Step 5: Run the test — expected pass.** `cargo test -p dkod-mcp --test execute_begin_tool`.
 - [ ] **Step 6: Commit.** `git add` files; standard identity-enforced commit.
 
-### Task 10: `dkod_abort` wrapper
+## Task 10: `dkod_abort` wrapper
 
 **Files:**
 - Create: `crates/dkod-mcp/src/tools/abort.rs`
@@ -1296,7 +1293,7 @@ impl McpServer {
 - [ ] **Step 5: Run the test — pass.**
 - [ ] **Step 6: Commit.**
 
-### Task 11: Recovery on restart
+## Task 11: Recovery on restart
 
 **Files:**
 - Create: `crates/dkod-mcp/src/recovery.rs`
@@ -1421,7 +1418,7 @@ async fn main() -> anyhow::Result<()> {
 - [ ] **Step 6: Run the test — pass.**
 - [ ] **Step 7: Commit.**
 
-### PR M2-3 wrap-up
+## PR M2-3 wrap-up
 
 - [ ] `/coderabbit:code-review` clean; `cargo test --workspace` green.
 - [ ] PR `M2-3: dkod_execute_begin + dkod_abort + recovery`. Merge autonomously.
@@ -1430,7 +1427,7 @@ async fn main() -> anyhow::Result<()> {
 
 # PR M2-4 — `dkod_write_symbol` with per-file lock
 
-### Task 12: Schema + pure wrapper
+## Task 12: Schema + pure wrapper
 
 **Files:**
 - Modify: `crates/dkod-mcp/src/schema.rs`
@@ -1585,7 +1582,7 @@ impl McpServer {
 - [ ] **Step 5: Run the test — pass.**
 - [ ] **Step 6: Commit.**
 
-### Task 13: Concurrent-write lock test
+## Task 13: Concurrent-write lock test
 
 This is the test that justifies the per-file lock's existence. It proves that two async writes to the same file are **serialised** (second write sees the first write's output, neither loses the other's change).
 
@@ -1664,7 +1661,7 @@ All 5 runs pass.
 
 - [ ] **Step 4: Commit.**
 
-### Task 14: Raw end-to-end write via MCP client
+## Task 14: Raw end-to-end write via MCP client
 
 **Files:**
 - Append to `crates/dkod-mcp/tests/write_symbol_tool.rs`
@@ -1674,7 +1671,7 @@ All 5 runs pass.
 - [ ] **Step 2: Run — pass.**
 - [ ] **Step 3: Commit.**
 
-### PR M2-4 wrap-up
+## PR M2-4 wrap-up
 
 - [ ] `/coderabbit:code-review` clean; `cargo test --workspace` green.
 - [ ] PR `M2-4: dkod_write_symbol + per-file lock`. Merge autonomously.
@@ -1683,7 +1680,7 @@ All 5 runs pass.
 
 # PR M2-5 — `dkod_execute_complete` + `dkod_status`
 
-### Task 15: Schema
+## Task 15: Schema
 
 ```rust
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
@@ -1714,7 +1711,7 @@ pub struct GroupStatusEntry {
 }
 ```
 
-### Task 16: `dkod_execute_complete` wrapper
+## Task 16: `dkod_execute_complete` wrapper
 
 **Files:**
 - Create: `crates/dkod-mcp/src/tools/execute_complete.rs`
@@ -1795,7 +1792,7 @@ impl McpServer {
 
 - [ ] **Step 4: Run — pass. Commit.**
 
-### Task 17: `dkod_status` (read-only)
+## Task 17: `dkod_status` (read-only)
 
 **Files:**
 - Create: `crates/dkod-mcp/src/tools/status.rs`
@@ -1886,7 +1883,7 @@ impl McpServer {
 
 - [ ] **Step 4: Run — pass. Commit.**
 
-### PR M2-5 wrap-up
+## PR M2-5 wrap-up
 
 - [ ] `/coderabbit:code-review` clean; `cargo test --workspace` green.
 - [ ] PR `M2-5: dkod_execute_complete + dkod_status`. Merge autonomously.
@@ -1895,7 +1892,7 @@ impl McpServer {
 
 # PR M2-6 — `dkod_commit`
 
-### Task 18: Schema + wrapper
+## Task 18: Schema + wrapper
 
 **Files:**
 - Modify: `crates/dkod-mcp/src/schema.rs`
@@ -2031,7 +2028,7 @@ impl McpServer {
 
 - [ ] **Step 5: Run — pass. Commit.**
 
-### Task 19: Commit updates manifest to `Committed`
+## Task 19: Commit updates manifest to `Committed`
 
 **Files:**
 - Modify: `crates/dkod-mcp/src/tools/commit.rs`
@@ -2055,7 +2052,7 @@ m.save(&ctx.paths)?;
 
 - [ ] **Step 4: Run — pass. Commit.**
 
-### PR M2-6 wrap-up
+## PR M2-6 wrap-up
 
 - [ ] `/coderabbit:code-review` clean; `cargo test --workspace` green.
 - [ ] PR `M2-6: dkod_commit`. Merge autonomously.
@@ -2066,7 +2063,7 @@ m.save(&ctx.paths)?;
 
 This PR introduces the `gh` subprocess helper + idempotency + verify-command handling. Tests are the tricky part: we can't call real `gh` from CI. Use a `PATH`-shimmed `gh` script that records its args and emits canned JSON.
 
-### Task 20: `gh` helper module
+## Task 20: `gh` helper module
 
 **Files:**
 - Create: `crates/dkod-mcp/src/gh.rs`
@@ -2182,7 +2179,7 @@ pub fn create_pr(
 - [ ] **Step 4: Register module.** Add `pub mod gh;` to `lib.rs`.
 - [ ] **Step 5: Run the test — pass. Commit.**
 
-### Task 21: `dkod_pr` schema + happy-path wrapper
+## Task 21: `dkod_pr` schema + happy-path wrapper
 
 **Files:**
 - Modify: `crates/dkod-mcp/src/schema.rs`
@@ -2324,7 +2321,7 @@ impl McpServer {
 
 - [ ] **Step 5: Run the test — pass. Commit.**
 
-### Task 22: Verify-fail test
+## Task 22: Verify-fail test
 
 - [ ] **Step 1: Write a test that sets `verify_cmd = "false"` in `.dkod/config.toml` and asserts `dkod_pr` errors with `VerifyFailed`.**
 
@@ -2351,7 +2348,7 @@ async fn pr_errors_when_verify_cmd_fails() {
 - [ ] **Step 2: Run — pass (`verify_cmd` handling is already implemented in Task 21).**
 - [ ] **Step 3: Commit.**
 
-### Task 23: Existing-branch-no-remote edge case
+## Task 23: Existing-branch-no-remote edge case
 
 - [ ] **Step 1: Write a test that shims `gh pr list` to return empty AND `gh pr create` to return a canned URL. Asserts `was_existing == false` and the URL comes through.**
 
@@ -2359,7 +2356,7 @@ async fn pr_errors_when_verify_cmd_fails() {
 
 - [ ] **Step 2: Run — pass. Commit.**
 
-### PR M2-7 wrap-up
+## PR M2-7 wrap-up
 
 - [ ] `/coderabbit:code-review` clean; `cargo test --workspace` green.
 - [ ] PR `M2-7: dkod_pr (idempotent) + gh subprocess helper`. Merge autonomously.
@@ -2368,7 +2365,7 @@ async fn pr_errors_when_verify_cmd_fails() {
 
 # PR M2-8 — End-to-end smoke test
 
-### Task 24: Full flow via in-process client
+## Task 24: Full flow via in-process client
 
 **Files:**
 - Create: `crates/dkod-mcp/tests/e2e_smoke.rs`
@@ -2454,7 +2451,7 @@ async fn full_plan_to_pr_flow() {
 
 - [ ] **Step 2: Run — compile error (helpers missing).**
 
-### Task 25: `common` helpers for tool-by-name JSON calls + env override
+## Task 25: `common` helpers for tool-by-name JSON calls + env override
 
 **Files:**
 - Modify: `crates/dkod-mcp/tests/common/mod.rs`
@@ -2510,7 +2507,7 @@ esac"#);
 - [ ] **Step 2: Run the smoke test.** `cargo test -p dkod-mcp --test e2e_smoke -- --nocapture` → PASS.
 - [ ] **Step 3: Commit.**
 
-### Task 26: Spec-mapping table in the README
+## Task 26: Spec-mapping table in the README
 
 **Files:**
 - Modify: `README.md` (root)
@@ -2534,7 +2531,7 @@ GIT_COMMITTER_NAME="Haim Ari" GIT_COMMITTER_EMAIL="haimari1@gmail.com" \
 git commit -m "Update README: M2 landed, 8 PRs merged"
 ```
 
-### PR M2-8 wrap-up
+## PR M2-8 wrap-up
 
 - [ ] `/coderabbit:code-review` on the Rust changes (skip for README-only tail commit); `cargo test --workspace` green.
 - [ ] PR `M2-8: end-to-end MCP smoke test`. Merge autonomously.

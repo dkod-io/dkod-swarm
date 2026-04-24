@@ -40,6 +40,10 @@ impl ServerCtx {
     /// an `Arc<Mutex<()>>` that the caller can `.lock().await` independently
     /// of the map.
     pub async fn file_lock(&self, abs_path: &Path) -> Arc<Mutex<()>> {
+        debug_assert!(
+            abs_path.is_absolute(),
+            "ServerCtx::file_lock expects an absolute, canonicalised path; got {abs_path:?}"
+        );
         let mut map = self.file_locks.lock().await;
         map.entry(abs_path.to_path_buf())
             .or_insert_with(|| Arc::new(Mutex::new(())))
@@ -50,14 +54,14 @@ impl ServerCtx {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
 
     #[tokio::test]
     async fn file_lock_returns_same_arc_for_same_path() {
         let tmp = tempfile::tempdir().unwrap();
         let ctx = ServerCtx::new(tmp.path());
-        let a = ctx.file_lock(Path::new("/tmp/x")).await;
-        let b = ctx.file_lock(Path::new("/tmp/x")).await;
+        let p = tmp.path().join("x");
+        let a = ctx.file_lock(&p).await;
+        let b = ctx.file_lock(&p).await;
         assert!(Arc::ptr_eq(&a, &b), "same path should share a lock");
     }
 
@@ -65,8 +69,8 @@ mod tests {
     async fn file_lock_returns_distinct_arcs_for_different_paths() {
         let tmp = tempfile::tempdir().unwrap();
         let ctx = ServerCtx::new(tmp.path());
-        let a = ctx.file_lock(Path::new("/tmp/x")).await;
-        let b = ctx.file_lock(Path::new("/tmp/y")).await;
+        let a = ctx.file_lock(&tmp.path().join("x")).await;
+        let b = ctx.file_lock(&tmp.path().join("y")).await;
         assert!(
             !Arc::ptr_eq(&a, &b),
             "different paths should have distinct locks"
