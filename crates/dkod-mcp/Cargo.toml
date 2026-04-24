@@ -12,7 +12,6 @@ dkod-worktree = { path = "../dkod-worktree" }
 dkod-orchestrator = { path = "../dkod-orchestrator" }
 rmcp.workspace = true
 tokio.workspace = true
-schemars.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
 serde.workspace = true

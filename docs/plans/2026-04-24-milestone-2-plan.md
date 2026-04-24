@@ -6,7 +6,7 @@
 
 **Architecture:** One new crate `crates/dkod-mcp` under the existing Cargo workspace. A `stdio` binary target (`dkod-mcp`) and a library surface tested via an in-process rmcp client. Server state is a single `ServerCtx` holding: repo root, `dkod_worktree::Paths`, an `Option<SessionId>` for the active session, and a `HashMap<PathBuf, Arc<tokio::sync::Mutex<()>>>` lock table for `dkod_write_symbol`. Recovery on restart scans `.dkod/sessions/` and picks the session whose `Manifest.status == Executing` (design §State). Every tool is a thin async wrapper: it loads/saves manifests via M1 APIs, never re-implements business logic. The one new subprocess integration (`gh`) lives in a small `gh.rs` helper in this crate — not in `dkod-worktree`, because it is only used at PR time.
 
-**Tech Stack:** Rust 2024. New crate deps: `rmcp 1.5` (features `server`, `macros`, `transport-io`), `tokio 1` (features `rt-multi-thread`, `macros`, `sync`, `io-std`, `process`), `schemars 0.8` (for rmcp JSON-schema derivation), `async-trait` (rmcp hint), `chrono 0.4` (ISO-8601 timestamps for `Manifest.created_at` / `WriteRecord.timestamp`). Tests use `anyhow`, `tempfile`, and rmcp's `client` feature for in-process harness.
+**Tech Stack:** Rust 2024. New crate deps: `rmcp 1.5` (features `server`, `client`, `macros`, `transport-io`), `tokio 1` (features `rt-multi-thread`, `macros`, `sync`, `io-std`, `process`, `time`), `async-trait` (rmcp hint), `chrono 0.4` (ISO-8601 timestamps for `Manifest.created_at` / `WriteRecord.timestamp`). JSON-schema derivation uses rmcp's re-exported `schemars` (M2-2 probe: rmcp 1.5 depends on schemars 1.2; importing `use rmcp::schemars;` avoids a second version in the dep graph). Tests use `anyhow`, `tempfile`, and rmcp's `client` feature for in-process harness.
 
 ---
 
@@ -153,10 +153,11 @@ Edit `Cargo.toml` (workspace root) — keep existing keys untouched; append to `
 ```toml
 rmcp = { version = "1.5", features = ["server", "client", "macros", "transport-io"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "io-std", "process", "time"] }
-schemars = "0.8"
 async-trait = "0.1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 ```
+
+> **schemars note:** do not add `schemars` to the workspace dependencies. rmcp 1.5 already depends on `schemars 1.2` and re-exports it as `rmcp::schemars`. All tool request/response types derive via `use rmcp::schemars; #[derive(schemars::JsonSchema)]`. Adding our own `schemars` pin would put two major versions in the dep graph.
 
 And extend the `members` list:
 
