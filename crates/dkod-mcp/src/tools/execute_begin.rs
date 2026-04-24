@@ -79,11 +79,29 @@ pub async fn execute_begin(
     })();
 
     if let Err(e) = result {
-        // Best-effort rollback — ignore cleanup errors so the original
-        // failure is what surfaces to the caller.
-        let _ = branch::destroy_dk_branch(&ctx.repo_root, &main, sid.as_str());
-        if let Ok(session_dir) = ctx.paths.session(sid.as_str()) {
-            let _ = std::fs::remove_dir_all(session_dir);
+        // Best-effort rollback — cleanup failures are logged but do not
+        // replace the original error returned to the caller (a useful
+        // error for the user is more important than an error about the
+        // cleanup). Orphan `dk/<sid>` branches from a *crash* (not an
+        // error return) between `create_dk_branch` and `manifest.save`
+        // are a known limitation of M2-3: `recover()` only looks for
+        // manifests with `Executing` status, so a crashed partial-begin
+        // leaves a stale branch until the user cleans it up manually.
+        // A future PR can add a "preparing" marker file that recovery
+        // reconciles.
+        if let Err(rollback_err) = branch::destroy_dk_branch(&ctx.repo_root, &main, sid.as_str()) {
+            eprintln!(
+                "dkod-mcp execute_begin: rollback destroy_dk_branch failed for {sid}: {rollback_err}"
+            );
+        }
+        if let Ok(session_dir) = ctx.paths.session(sid.as_str())
+            && session_dir.exists()
+            && let Err(rm_err) = std::fs::remove_dir_all(&session_dir)
+        {
+            eprintln!(
+                "dkod-mcp execute_begin: rollback remove session dir {} failed: {rm_err}",
+                session_dir.display()
+            );
         }
         return Err(e);
     }

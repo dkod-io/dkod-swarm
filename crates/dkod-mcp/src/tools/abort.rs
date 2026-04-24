@@ -39,9 +39,17 @@ pub async fn abort(ctx: &ServerCtx) -> Result<AbortResponse> {
     // because recovery would otherwise see `status = Executing` + no
     // branch on next startup and adopt a zombie session. Returning the
     // error here keeps the abort retryable.
-    if let Ok(mut m) = Manifest::load(&ctx.paths, &sid) {
-        m.status = SessionStatus::Aborted;
-        m.save(&ctx.paths)?;
+    match Manifest::load(&ctx.paths, &sid) {
+        Ok(mut m) => {
+            m.status = SessionStatus::Aborted;
+            m.save(&ctx.paths)?;
+        }
+        Err(e) => {
+            // Non-fatal by design: a retry-after-partial-abort or a
+            // legitimately corrupt manifest should not block branch cleanup.
+            // Logging keeps the incident diagnosable.
+            eprintln!("dkod-mcp abort: could not load manifest for {sid} (continuing): {e}");
+        }
     }
 
     branch::destroy_dk_branch(&ctx.repo_root, &main, sid.as_str())?;
