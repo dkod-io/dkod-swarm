@@ -26,11 +26,19 @@ This repo is the local-first, plugin-shipped variant of dkod. Scope and position
 - **Workspace layout** (per design §Repo layout): crates under `crates/`, plugin assets under `plugin/`, future Studio under `studio/`.
 - **Tests:** `cargo test --workspace` stays green on every PR. Planner tests are fixture-based — goldens under `crates/dkod-orchestrator/tests/fixtures/`. TDD: write the failing test first, then make it pass.
 
-## Review gate
+## Review gate (CodeRabbit)
 
-- **CodeRabbit before every code commit.** After `git add`, before `git commit`, run `/coderabbit:review` (the plugin slash command, not the raw `cr` CLI). Resolve findings. Applies to merges and amends too.
-- **Docs-only commits skip CodeRabbit.** `.md`/`.toml`/`.yaml`-only changesets aren't meaningfully reviewed by CodeRabbit — state that explicitly rather than claiming a clean review.
-- **After opening a PR,** wait for CodeRabbit's PR review, fix everything it raises, re-request review, iterate until clean. Do not merge with open CodeRabbit issues.
+Fixed workflow for every code change. Do **not** short-circuit it.
+
+1. **Local pre-commit review.** Before committing, run `/coderabbit:code-review` against the local untracked/unstaged changes (compared to `main`). Use `/coderabbit:code-review` specifically — not `/coderabbit:review`.
+2. **Fix every finding.**
+3. **Re-run `/coderabbit:code-review` locally.** Iterate until the local review is clean.
+4. **Only then commit and open the PR.** One logical unit per PR.
+5. **Wait for CodeRabbit's PR review** to post on the PR.
+6. **Run `/coderabbit:autofix`** to apply CodeRabbit's PR-side fixes. Iterate (re-review → autofix) until the PR is clean.
+7. **Then ask to merge.** Never merge with open CodeRabbit issues.
+
+**Docs-only commits** (`.md`/`.toml`/`.yaml`-only changesets) skip CodeRabbit — it doesn't meaningfully review those. State that explicitly rather than claiming a clean review.
 
 ## License
 
