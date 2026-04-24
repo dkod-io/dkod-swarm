@@ -6,7 +6,7 @@
 
 **Architecture:** One new crate `crates/dkod-mcp` under the existing Cargo workspace. A `stdio` binary target (`dkod-mcp`) and a library surface tested via an in-process rmcp client. Server state is a single `ServerCtx` holding: repo root, `dkod_worktree::Paths`, an `Option<SessionId>` for the active session, and a `HashMap<PathBuf, Arc<tokio::sync::Mutex<()>>>` lock table for `dkod_write_symbol`. Recovery on restart scans `.dkod/sessions/` and picks the session whose `Manifest.status == Executing` (design §State). Every tool is a thin async wrapper: it loads/saves manifests via M1 APIs, never re-implements business logic. The one new subprocess integration (`gh`) lives in a small `gh.rs` helper in this crate — not in `dkod-worktree`, because it is only used at PR time.
 
-**Tech Stack:** Rust 2024. New crate deps: `rmcp 1.5` (features `server`, `macros`, `transport-io`), `tokio 1` (features `rt-multi-thread`, `macros`, `sync`, `io-std`, `process`), `schemars 0.8` (for rmcp JSON-schema derivation), `async-trait` (rmcp hint), `chrono 0.4` (ISO-8601 timestamps for `Manifest.created_at` / `WriteRecord.timestamp`). Tests use `anyhow`, `tempfile`, and rmcp's `client` feature for in-process harness.
+**Tech Stack:** Rust 2024. New crate deps: `rmcp 1.5` (features `server`, `client`, `macros`, `transport-io`), `tokio 1` (features `rt-multi-thread`, `macros`, `sync`, `io-std`, `process`, `time`), `async-trait` (rmcp hint), `chrono 0.4` (ISO-8601 timestamps for `Manifest.created_at` / `WriteRecord.timestamp`). JSON-schema derivation uses rmcp's re-exported `schemars` (M2-2 probe: rmcp 1.5 depends on schemars 1.2; importing `use rmcp::schemars;` avoids a second version in the dep graph). Tests use `anyhow`, `tempfile`, and rmcp's `client` feature for in-process harness.
 
 ---
 
@@ -88,7 +88,7 @@ Integration tests (outside `tests/`) use the crate as a library (via `lib.rs`) a
 Every `#[tool]` method lives in **one** `#[tool_router] impl McpServer` block in `crates/dkod-mcp/src/tools/mod.rs`. Submodule files (`plan.rs`, `execute_begin.rs`, `write_symbol.rs`, …) contain **pure-function helpers only** — no `impl McpServer`, no `#[tool]`. Each tool task:
 
 1. Writes the pure-function helper(s) (and their unit tests) into the submodule file.
-2. Appends **one** `#[tool]` method to the single `impl` block in `tools/mod.rs` that delegates to the helper + `to_rmcp_error`.
+2. Appends **one** `#[tool]` method to the single `impl` block in `tools/mod.rs` that delegates to the helper and maps errors via `.map_err(Into::into)` (the `From<Error> for rmcp::ErrorData` impl in `error.rs` handles the variant → JSON-RPC code mapping).
 
 Where later tasks show code with `impl McpServer { #[tool] ... }` inline in a submodule snippet, that code is illustrative of the method body — actually place the method in `tools/mod.rs`. This keeps `#[tool_router]`'s attribute surface single-block and side-steps the per-rmcp-version split-across-files pitfall.
 
@@ -153,10 +153,11 @@ Edit `Cargo.toml` (workspace root) — keep existing keys untouched; append to `
 ```toml
 rmcp = { version = "1.5", features = ["server", "client", "macros", "transport-io"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "io-std", "process", "time"] }
-schemars = "0.8"
 async-trait = "0.1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 ```
+
+> **schemars note:** do not add `schemars` to the workspace dependencies. rmcp 1.5 already depends on `schemars 1.2` and re-exports it as `rmcp::schemars`. All tool request/response types derive via `use rmcp::schemars; #[derive(schemars::JsonSchema)]`. Adding our own `schemars` pin would put two major versions in the dep graph.
 
 And extend the `members` list:
 
@@ -904,11 +905,9 @@ pub fn build_plan(ctx: &ServerCtx, req: PlanRequest) -> Result<PlanResponse> {
     })
 }
 
-/// Map `dkod_mcp::Error` to `rmcp::ErrorData` preserving the message.
-pub(crate) fn to_rmcp_error(e: Error) -> rmcp::ErrorData {
-    rmcp::ErrorData::internal_error(e.to_string(), None)
-}
 ```
+
+Error mapping: implemented once as `impl From<Error> for rmcp::ErrorData` in `error.rs`, not as a helper in this file. `InvalidArg`, `UnknownGroup`, `NoActiveSession`, `SessionAlreadyActive` map to `invalid_params`; everything else maps to `internal_error`. Tool wrappers in `tools/mod.rs` just do `.map_err(Into::into)`.
 
 The `#[tool]` method wrapping `build_plan` lives in `tools/mod.rs` per Step 4.
 
@@ -926,7 +925,7 @@ impl McpServer {
         &self,
         Parameters(req): Parameters<crate::schema::PlanRequest>,
     ) -> std::result::Result<crate::schema::PlanResponse, rmcp::ErrorData> {
-        plan::build_plan(&self.ctx, req).map_err(plan::to_rmcp_error)
+        plan::build_plan(&self.ctx, req).map_err(Into::into)
     }
 }
 ```
@@ -1141,7 +1140,7 @@ async fn execute_begin_rejects_second_concurrent_session() {
 ```rust
 use crate::schema::{ExecuteBeginRequest, ExecuteBeginResponse};
 use crate::tools::McpServer;
-use crate::tools::plan::to_rmcp_error;
+
 use crate::{Error, Result, ServerCtx};
 use dkod_worktree::{
     GroupSpec, GroupStatus, Manifest, SessionId, SessionStatus, SymbolRef, branch,
@@ -1203,7 +1202,7 @@ impl McpServer {
         &self,
         Parameters(req): Parameters<ExecuteBeginRequest>,
     ) -> std::result::Result<ExecuteBeginResponse, rmcp::ErrorData> {
-        execute_begin(&self.ctx, req).await.map_err(to_rmcp_error)
+        execute_begin(&self.ctx, req).await.map_err(Into::into)
     }
 }
 ```
@@ -1262,7 +1261,7 @@ async fn abort_without_session_errors() {
 ```rust
 use crate::schema::AbortResponse;
 use crate::tools::McpServer;
-use crate::tools::plan::to_rmcp_error;
+
 use crate::{Error, Result, ServerCtx};
 use dkod_worktree::{Manifest, SessionStatus, branch};
 use rmcp::tool;
@@ -1289,7 +1288,7 @@ pub async fn abort(ctx: &ServerCtx) -> Result<AbortResponse> {
 impl McpServer {
     #[tool(description = "Abort the active session: destroy dk/<sid>, mark manifest Aborted, clear in-memory state.")]
     pub async fn dkod_abort(&self) -> std::result::Result<AbortResponse, rmcp::ErrorData> {
-        abort(&self.ctx).await.map_err(to_rmcp_error)
+        abort(&self.ctx).await.map_err(Into::into)
     }
 }
 ```
@@ -1523,7 +1522,7 @@ async fn write_symbol_replaces_function_body() {
 ```rust
 use crate::schema::{WriteSymbolRequest, WriteSymbolResponse};
 use crate::tools::McpServer;
-use crate::tools::plan::to_rmcp_error;
+
 use crate::{Error, Result, ServerCtx};
 use dkod_orchestrator::replace::{ReplaceOutcome, replace_symbol};
 use dkod_worktree::{WriteLog, WriteRecord};
@@ -1579,7 +1578,7 @@ impl McpServer {
         &self,
         Parameters(req): Parameters<WriteSymbolRequest>,
     ) -> std::result::Result<WriteSymbolResponse, rmcp::ErrorData> {
-        write_symbol(&self.ctx, req).await.map_err(to_rmcp_error)
+        write_symbol(&self.ctx, req).await.map_err(Into::into)
     }
 }
 ```
@@ -1762,7 +1761,7 @@ async fn execute_complete_marks_group_done() {
 ```rust
 use crate::schema::{ExecuteCompleteRequest, ExecuteCompleteResponse};
 use crate::tools::McpServer;
-use crate::tools::plan::to_rmcp_error;
+
 use crate::{Error, Result, ServerCtx};
 use dkod_worktree::{GroupSpec, GroupStatus};
 use rmcp::{handler::server::wrapper::Parameters, tool};
@@ -1790,7 +1789,7 @@ impl McpServer {
         &self,
         Parameters(req): Parameters<ExecuteCompleteRequest>,
     ) -> std::result::Result<ExecuteCompleteResponse, rmcp::ErrorData> {
-        execute_complete(&self.ctx, req).await.map_err(to_rmcp_error)
+        execute_complete(&self.ctx, req).await.map_err(Into::into)
     }
 }
 ```
@@ -1837,7 +1836,7 @@ async fn status_is_empty_when_no_session() {
 ```rust
 use crate::schema::{GroupStatusEntry, StatusResponse};
 use crate::tools::McpServer;
-use crate::tools::plan::to_rmcp_error;
+
 use crate::{Result, ServerCtx};
 use dkod_worktree::{GroupSpec, GroupStatus, Manifest, WriteLog, branch};
 use rmcp::tool;
@@ -1881,7 +1880,7 @@ pub async fn status(ctx: &ServerCtx) -> Result<StatusResponse> {
 impl McpServer {
     #[tool(description = "Return the active session id, dk-branch, and per-group status + write count.")]
     pub async fn dkod_status(&self) -> std::result::Result<StatusResponse, rmcp::ErrorData> {
-        status(&self.ctx).await.map_err(to_rmcp_error)
+        status(&self.ctx).await.map_err(Into::into)
     }
 }
 ```
@@ -1967,7 +1966,7 @@ async fn commit_writes_one_commit_per_group_with_writes() {
 ```rust
 use crate::schema::CommitResponse;
 use crate::tools::McpServer;
-use crate::tools::plan::to_rmcp_error;
+
 use crate::{Error, Result, ServerCtx};
 use dkod_orchestrator::commit::commit_per_group;
 use dkod_worktree::{Manifest, branch};
@@ -2026,7 +2025,7 @@ fn git_rev_list(repo: &std::path::Path, range: &str) -> Result<Vec<String>> {
 impl McpServer {
     #[tool(description = "Finalize the active session by writing one commit per group (with writes) on the dk-branch. Identity is forced to Haim Ari <haimari1@gmail.com>.")]
     pub async fn dkod_commit(&self) -> std::result::Result<CommitResponse, rmcp::ErrorData> {
-        commit(&self.ctx).await.map_err(to_rmcp_error)
+        commit(&self.ctx).await.map_err(Into::into)
     }
 }
 ```
@@ -2251,7 +2250,7 @@ async fn pr_is_idempotent_when_already_open() {
 use crate::gh;
 use crate::schema::{PrRequest, PrResponse};
 use crate::tools::McpServer;
-use crate::tools::plan::to_rmcp_error;
+
 use crate::{Error, Result, ServerCtx};
 use dkod_worktree::{Config, Manifest, SessionStatus, branch};
 use rmcp::{handler::server::wrapper::Parameters, tool};
@@ -2319,7 +2318,7 @@ impl McpServer {
         &self,
         Parameters(req): Parameters<PrRequest>,
     ) -> std::result::Result<PrResponse, rmcp::ErrorData> {
-        pr(&self.ctx, req).await.map_err(to_rmcp_error)
+        pr(&self.ctx, req).await.map_err(Into::into)
     }
 }
 ```

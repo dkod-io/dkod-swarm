@@ -32,3 +32,22 @@ pub enum Error {
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+/// Map our error variants onto MCP / JSON-RPC response codes. Variants that
+/// describe bad client input get `invalid_params`; everything else (I/O,
+/// wrapped sub-errors, subprocess failures) gets `internal_error`. Used by
+/// every `#[tool]` wrapper's `.map_err(Into::into)`; defined here (rather
+/// than in `tools/plan.rs`) so later tool modules don't need to reach into
+/// the `plan` module to borrow a helper.
+impl From<Error> for rmcp::ErrorData {
+    fn from(e: Error) -> Self {
+        let message = e.to_string();
+        match e {
+            Error::InvalidArg(_)
+            | Error::UnknownGroup(_)
+            | Error::NoActiveSession
+            | Error::SessionAlreadyActive(_) => rmcp::ErrorData::invalid_params(message, None),
+            _ => rmcp::ErrorData::internal_error(message, None),
+        }
+    }
+}
