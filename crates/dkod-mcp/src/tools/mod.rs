@@ -1,3 +1,4 @@
+pub mod execute_begin;
 pub mod plan;
 
 use crate::ServerCtx;
@@ -54,6 +55,23 @@ impl McpServer {
             .map_err(|e| {
                 rmcp::ErrorData::internal_error(format!("spawn_blocking join error: {e}"), None)
             })?
+            .map(Json)
+            .map_err(Into::into)
+    }
+
+    #[tool(
+        description = "Begin execution: mint a session id, create dk/<sid> branch off main, and persist manifest + per-group specs under .dkod/sessions/."
+    )]
+    pub async fn dkod_execute_begin(
+        &self,
+        Parameters(req): Parameters<crate::schema::ExecuteBeginRequest>,
+    ) -> std::result::Result<Json<crate::schema::ExecuteBeginResponse>, rmcp::ErrorData> {
+        // `execute_begin` is light sync I/O plus a single `git checkout -b`;
+        // run it directly on the async path. The heavier tree-sitter work
+        // is what justifies `spawn_blocking` for `dkod_plan`; this tool is
+        // not in that class for M2.
+        execute_begin::execute_begin(&self.ctx, req)
+            .await
             .map(Json)
             .map_err(Into::into)
     }

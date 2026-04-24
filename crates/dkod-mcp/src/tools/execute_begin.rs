@@ -1,0 +1,74 @@
+//! Pure helper for the `dkod_execute_begin` MCP tool.
+//!
+//! The `#[tool]` wrapper that exposes this lives in `tools/mod.rs`. This
+//! helper is `async` because it awaits `ctx.active_session.lock()`; the
+//! filesystem and git work it performs is otherwise synchronous and brief
+//! (a single `git checkout -b` plus a handful of small JSON writes). That
+//! matches M2's scope — if this ever grows into heavier per-group setup,
+//! future work can lift the sync I/O into `spawn_blocking` the way `plan`
+//! already does for the tree-sitter pass.
+
+use crate::schema::{ExecuteBeginRequest, ExecuteBeginResponse};
+use crate::{Error, Result, ServerCtx};
+use dkod_worktree::{
+    GroupSpec, GroupStatus, Manifest, SessionId, SessionStatus, SymbolRef, branch,
+};
+
+pub async fn execute_begin(
+    ctx: &ServerCtx,
+    req: ExecuteBeginRequest,
+) -> Result<ExecuteBeginResponse> {
+    if req.groups.is_empty() {
+        return Err(Error::InvalidArg("groups must be non-empty".into()));
+    }
+
+    // Guard the session-singleton invariant. We keep the guard for the full
+    // function body — no other tokio task can take it anyway (the server
+    // accepts only one active session per process), and holding it through
+    // the sync I/O means a concurrent `execute_begin` caller observes either
+    // "no session" or "session fully established", never a half-written one.
+    let mut active = ctx.active_session.lock().await;
+    if let Some(sid) = active.as_ref() {
+        return Err(Error::SessionAlreadyActive(sid.to_string()));
+    }
+
+    let sid = SessionId::generate();
+    let main = branch::detect_main(&ctx.repo_root)?;
+    branch::create_dk_branch(&ctx.repo_root, &main, sid.as_str())?;
+
+    let group_ids: Vec<String> = req.groups.iter().map(|g| g.id.clone()).collect();
+    let manifest = Manifest {
+        session_id: sid.clone(),
+        task_prompt: req.task_prompt,
+        created_at: crate::time::iso8601_now(),
+        status: SessionStatus::Executing,
+        group_ids: group_ids.clone(),
+    };
+    manifest.save(&ctx.paths)?;
+
+    for g in req.groups {
+        let spec = GroupSpec {
+            id: g.id,
+            symbols: g
+                .symbols
+                .into_iter()
+                .map(|s| SymbolRef {
+                    qualified_name: s.qualified_name,
+                    file_path: s.file_path,
+                    kind: s.kind,
+                })
+                .collect(),
+            agent_prompt: g.agent_prompt,
+            status: GroupStatus::Pending,
+        };
+        spec.save(&ctx.paths, &sid)?;
+    }
+
+    let resp = ExecuteBeginResponse {
+        session_id: sid.to_string(),
+        dk_branch: branch::dk_branch_name(sid.as_str()),
+        group_ids,
+    };
+    *active = Some(sid);
+    Ok(resp)
+}
