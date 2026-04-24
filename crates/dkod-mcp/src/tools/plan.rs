@@ -3,14 +3,42 @@ use crate::{Error, Result, ServerCtx};
 use dkod_orchestrator::callgraph::CallGraph;
 use dkod_orchestrator::partition::partition;
 use dkod_orchestrator::symbols::extract_rust_file;
+use std::path::{Path, PathBuf};
+
+/// Canonicalise `rel` against `repo_root` and reject anything that escapes
+/// the repo. Defends against three shapes of malicious input from an MCP
+/// caller: (a) absolute paths, (b) `..` traversal, (c) symlinks pointing
+/// outside the repo.
+fn resolve_under_repo(repo_root: &Path, rel: &Path) -> Result<PathBuf> {
+    if rel.is_absolute() {
+        return Err(Error::InvalidArg(format!(
+            "path must be relative to the repo root, got absolute: {}",
+            rel.display()
+        )));
+    }
+    let canonical_repo = std::fs::canonicalize(repo_root).map_err(Error::Io)?;
+    let canonical_target = std::fs::canonicalize(canonical_repo.join(rel)).map_err(|e| {
+        Error::InvalidArg(format!(
+            "cannot resolve {} under repo root: {e}",
+            rel.display()
+        ))
+    })?;
+    if !canonical_target.starts_with(&canonical_repo) {
+        return Err(Error::InvalidArg(format!(
+            "path escapes repo root: {} resolves to {}",
+            rel.display(),
+            canonical_target.display()
+        )));
+    }
+    Ok(canonical_target)
+}
 
 /// Pure helper used by both the MCP wrapper and unit tests.
 ///
-/// M2 scope note: file reads here are synchronous `std::fs::read`. For the
-/// small fixtures M2 exercises this is fine on the async runtime; later
-/// milestones that scale to a full Rust crate should wrap this in
-/// `tokio::task::spawn_blocking` so the executor thread is not held while
-/// the partitioner runs on cold caches.
+/// Synchronous on purpose — every call site (the MCP `#[tool]` wrapper in
+/// `tools/mod.rs` and the unit tests) drives it through
+/// `tokio::task::spawn_blocking` so the tokio executor thread is never held
+/// while tree-sitter parses or while the partitioner walks the call graph.
 pub fn build_plan(ctx: &ServerCtx, req: PlanRequest) -> Result<PlanResponse> {
     if req.target_groups == 0 {
         return Err(Error::InvalidArg("target_groups must be >= 1".into()));
@@ -18,7 +46,7 @@ pub fn build_plan(ctx: &ServerCtx, req: PlanRequest) -> Result<PlanResponse> {
     let mut all_symbols = Vec::new();
     let mut all_edges = Vec::new();
     for rel in &req.files {
-        let abs = ctx.repo_root.join(rel);
+        let abs = resolve_under_repo(&ctx.repo_root, rel)?;
         let bytes = std::fs::read(&abs).map_err(Error::Io)?;
         let (syms, edges) = extract_rust_file(&bytes, &abs)?;
         all_symbols.extend(syms);

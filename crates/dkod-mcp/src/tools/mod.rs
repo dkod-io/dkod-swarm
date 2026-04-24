@@ -44,7 +44,18 @@ impl McpServer {
         &self,
         Parameters(req): Parameters<crate::schema::PlanRequest>,
     ) -> std::result::Result<Json<crate::schema::PlanResponse>, rmcp::ErrorData> {
-        plan::build_plan(&self.ctx, req).map(Json).map_err(Into::into)
+        // `build_plan` reads files from disk and runs tree-sitter +
+        // partition algorithms — both synchronous, potentially slow on a
+        // real-world codebase. `spawn_blocking` keeps the tokio executor
+        // thread free while that work runs.
+        let ctx = self.ctx.clone();
+        tokio::task::spawn_blocking(move || plan::build_plan(&ctx, req))
+            .await
+            .map_err(|e| {
+                rmcp::ErrorData::internal_error(format!("spawn_blocking join error: {e}"), None)
+            })?
+            .map(Json)
+            .map_err(Into::into)
     }
 }
 
