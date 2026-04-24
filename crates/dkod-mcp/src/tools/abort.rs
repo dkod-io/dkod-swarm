@@ -34,14 +34,14 @@ pub async fn abort(ctx: &ServerCtx) -> Result<AbortResponse> {
     // into thinking the session is still Executing.
     //
     // A missing or malformed manifest is tolerated (this flow may be a
-    // retry after a prior partial abort). Save failures are logged but
-    // non-fatal — the in-memory state must still be cleared downstream
-    // so the session isn't stuck "active".
+    // retry after a prior partial abort). A save failure IS fatal: if we
+    // cannot persist `Aborted` to disk we must not destroy the branch,
+    // because recovery would otherwise see `status = Executing` + no
+    // branch on next startup and adopt a zombie session. Returning the
+    // error here keeps the abort retryable.
     if let Ok(mut m) = Manifest::load(&ctx.paths, &sid) {
         m.status = SessionStatus::Aborted;
-        if let Err(e) = m.save(&ctx.paths) {
-            eprintln!("dkod-mcp abort: failed to persist Aborted manifest for {sid}: {e}");
-        }
+        m.save(&ctx.paths)?;
     }
 
     branch::destroy_dk_branch(&ctx.repo_root, &main, sid.as_str())?;

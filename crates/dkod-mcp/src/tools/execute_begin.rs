@@ -39,38 +39,54 @@ pub async fn execute_begin(
     let main = ctx.resolve_main()?;
     branch::create_dk_branch(&ctx.repo_root, &main, sid.as_str())?;
 
-    // Persist all GroupSpec entries BEFORE writing the manifest. That way
-    // a crash or I/O failure during spec writes leaves no `Executing`
-    // manifest on disk, so restart-recovery won't pick up a half-written
-    // session. (An orphan dk-branch with no manifest is the only collateral
-    // and is cleanly handled by the user re-running or via `dkod_abort`.)
+    // Once the branch exists, any I/O failure below must be unwound: since
+    // `active_session` is not set until the very end, the caller cannot
+    // reach the orphan branch via `dkod_abort`. The closure pattern groups
+    // the fallible writes so we have one place to clean up on error.
     let group_ids: Vec<String> = req.groups.iter().map(|g| g.id.clone()).collect();
-    for g in req.groups {
-        let spec = GroupSpec {
-            id: g.id,
-            symbols: g
-                .symbols
-                .into_iter()
-                .map(|s| SymbolRef {
-                    qualified_name: s.qualified_name,
-                    file_path: s.file_path,
-                    kind: s.kind,
-                })
-                .collect(),
-            agent_prompt: g.agent_prompt,
-            status: GroupStatus::Pending,
-        };
-        spec.save(&ctx.paths, &sid)?;
-    }
+    let result = (|| -> Result<()> {
+        // Persist all GroupSpec entries BEFORE writing the manifest. That
+        // way a crash between spec writes and the manifest leaves no
+        // `Executing` manifest on disk, so restart-recovery won't pick up
+        // a half-written session.
+        for g in req.groups {
+            let spec = GroupSpec {
+                id: g.id,
+                symbols: g
+                    .symbols
+                    .into_iter()
+                    .map(|s| SymbolRef {
+                        qualified_name: s.qualified_name,
+                        file_path: s.file_path,
+                        kind: s.kind,
+                    })
+                    .collect(),
+                agent_prompt: g.agent_prompt,
+                status: GroupStatus::Pending,
+            };
+            spec.save(&ctx.paths, &sid)?;
+        }
 
-    let manifest = Manifest {
-        session_id: sid.clone(),
-        task_prompt: req.task_prompt,
-        created_at: crate::time::iso8601_now(),
-        status: SessionStatus::Executing,
-        group_ids: group_ids.clone(),
-    };
-    manifest.save(&ctx.paths)?;
+        let manifest = Manifest {
+            session_id: sid.clone(),
+            task_prompt: req.task_prompt,
+            created_at: crate::time::iso8601_now(),
+            status: SessionStatus::Executing,
+            group_ids: group_ids.clone(),
+        };
+        manifest.save(&ctx.paths)?;
+        Ok(())
+    })();
+
+    if let Err(e) = result {
+        // Best-effort rollback — ignore cleanup errors so the original
+        // failure is what surfaces to the caller.
+        let _ = branch::destroy_dk_branch(&ctx.repo_root, &main, sid.as_str());
+        if let Ok(session_dir) = ctx.paths.session(sid.as_str()) {
+            let _ = std::fs::remove_dir_all(session_dir);
+        }
+        return Err(e);
+    }
 
     let resp = ExecuteBeginResponse {
         session_id: sid.to_string(),
