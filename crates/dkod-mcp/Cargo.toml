@@ -1,0 +1,24 @@
+[package]
+name = "dkod-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Stdio MCP server exposing the 8-tool dkod-swarm surface"
+
+[dependencies]
+dkod-worktree = { path = "../dkod-worktree" }
+dkod-orchestrator = { path = "../dkod-orchestrator" }
+rmcp.workspace = true
+tokio.workspace = true
+schemars.workspace = true
+async-trait.workspace = true
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
