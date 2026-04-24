@@ -163,8 +163,10 @@ fn m1_happy_path_produces_expected_git_log() {
     // Source reflects the replacements.
     let final_src =
         String::from_utf8(std::fs::read(repo.join("src/lib.rs")).unwrap()).unwrap();
+    // Both groups' replacements must be present; OR would let a silent
+    // fallback on one replacement pass the test unnoticed.
     assert!(
-        final_src.contains("10") || final_src.contains("20"),
-        "replacements not applied: {final_src}"
+        final_src.contains("10") && final_src.contains("20"),
+        "both replacements must land: {final_src}"
     );
 }
