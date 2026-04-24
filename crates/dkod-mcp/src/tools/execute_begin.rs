@@ -33,19 +33,18 @@ pub async fn execute_begin(
     }
 
     let sid = SessionId::generate();
-    let main = branch::detect_main(&ctx.repo_root)?;
+    // Use `ctx.resolve_main()` for consistency with `abort` / future
+    // `commit` / `pr`, even though at this point HEAD is still on the true
+    // main so `detect_main` would also work.
+    let main = ctx.resolve_main()?;
     branch::create_dk_branch(&ctx.repo_root, &main, sid.as_str())?;
 
+    // Persist all GroupSpec entries BEFORE writing the manifest. That way
+    // a crash or I/O failure during spec writes leaves no `Executing`
+    // manifest on disk, so restart-recovery won't pick up a half-written
+    // session. (An orphan dk-branch with no manifest is the only collateral
+    // and is cleanly handled by the user re-running or via `dkod_abort`.)
     let group_ids: Vec<String> = req.groups.iter().map(|g| g.id.clone()).collect();
-    let manifest = Manifest {
-        session_id: sid.clone(),
-        task_prompt: req.task_prompt,
-        created_at: crate::time::iso8601_now(),
-        status: SessionStatus::Executing,
-        group_ids: group_ids.clone(),
-    };
-    manifest.save(&ctx.paths)?;
-
     for g in req.groups {
         let spec = GroupSpec {
             id: g.id,
@@ -63,6 +62,15 @@ pub async fn execute_begin(
         };
         spec.save(&ctx.paths, &sid)?;
     }
+
+    let manifest = Manifest {
+        session_id: sid.clone(),
+        task_prompt: req.task_prompt,
+        created_at: crate::time::iso8601_now(),
+        status: SessionStatus::Executing,
+        group_ids: group_ids.clone(),
+    };
+    manifest.save(&ctx.paths)?;
 
     let resp = ExecuteBeginResponse {
         session_id: sid.to_string(),

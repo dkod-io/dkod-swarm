@@ -26,14 +26,25 @@ pub async fn abort(ctx: &ServerCtx) -> Result<AbortResponse> {
     // reflects HEAD) — calling destroy with that as "main" would try to
     // check out, then delete, the very branch we are on.
     let main = ctx.resolve_main()?;
-    branch::destroy_dk_branch(&ctx.repo_root, &main, sid.as_str())?;
 
-    // Tolerate a missing / malformed manifest — the in-memory state must
-    // still be cleared so a retried abort isn't left in a zombie state.
+    // Mark the manifest Aborted BEFORE destroying the dk-branch. That way
+    // a crash or git failure during branch destruction still leaves a
+    // consistent on-disk "this session is aborted" record — the dead
+    // branch can be cleaned up later without misleading restart-recovery
+    // into thinking the session is still Executing.
+    //
+    // A missing or malformed manifest is tolerated (this flow may be a
+    // retry after a prior partial abort). Save failures are logged but
+    // non-fatal — the in-memory state must still be cleared downstream
+    // so the session isn't stuck "active".
     if let Ok(mut m) = Manifest::load(&ctx.paths, &sid) {
         m.status = SessionStatus::Aborted;
-        m.save(&ctx.paths)?;
+        if let Err(e) = m.save(&ctx.paths) {
+            eprintln!("dkod-mcp abort: failed to persist Aborted manifest for {sid}: {e}");
+        }
     }
+
+    branch::destroy_dk_branch(&ctx.repo_root, &main, sid.as_str())?;
 
     // Clear file locks BEFORE clearing `active_session`. Clearing locks
     // after clearing active would leave a TOCTOU window: a future M2-4
