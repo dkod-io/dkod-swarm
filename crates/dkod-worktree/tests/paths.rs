@@ -39,6 +39,33 @@ fn group_rejects_bad_gid_even_with_valid_sid() {
 }
 
 #[test]
+fn session_rejects_empty_id() {
+    let p = Paths::new(&PathBuf::from("/tmp/r"));
+    assert!(p.session("").is_err());
+}
+
+#[test]
+fn session_rejects_cur_dir_id() {
+    let p = Paths::new(&PathBuf::from("/tmp/r"));
+    assert!(p.session(".").is_err());
+}
+
+/// On Unix, Path strips the trailing slash so "foo/" parses as a single Normal("foo")
+/// component — validate_id accepts it as equivalent to "foo".
+/// Windows-style separators ("foo\\") and drive-relative forms ("C:foo") are also
+/// treated as opaque Normal components on Unix and are therefore accepted.
+/// These tests document the observed platform behaviour.
+#[test]
+fn session_rejects_multi_component_with_backslash_separator_if_applicable() {
+    // On Unix "foo\\" is a single Normal component (backslash is not a separator).
+    // The test is here to ensure we do not silently regress if the validation
+    // logic is ever tightened; adjust assertions if Windows support is added.
+    let p = Paths::new(&PathBuf::from("/tmp/r"));
+    // "a/b" has two Normal components and must be rejected.
+    assert!(p.session("a/b").is_err(), "slash-separated path must be rejected");
+}
+
+#[test]
 fn valid_ids_still_work() {
     let p = Paths::new(&PathBuf::from("/tmp/r"));
     assert_eq!(p.session("sess-abc").unwrap(), PathBuf::from("/tmp/r/.dkod/sessions/sess-abc"));

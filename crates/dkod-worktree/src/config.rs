@@ -21,11 +21,11 @@ impl Config {
 
     pub fn save(&self, path: &Path) -> Result<()> {
         let text = toml::to_string_pretty(self)?;
-        if let Some(parent) = path.parent() {
-            if !parent.as_os_str().is_empty() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|e| Error::Io { path: parent.to_path_buf(), source: e })?;
-            }
+        if let Some(parent) = path.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| Error::Io { path: parent.to_path_buf(), source: e })?;
         }
         std::fs::write(path, text)
             .map_err(|e| Error::Io { path: path.to_path_buf(), source: e })

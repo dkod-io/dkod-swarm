@@ -12,9 +12,6 @@ pub struct Paths {
 /// Rejects absolute paths, path separators, `..` traversals, and any string
 /// whose only component is not a plain `Normal` segment.
 fn validate_id(id: &str) -> Result<()> {
-    if id.starts_with('/') {
-        return Err(Error::InvalidComponent(id.to_owned()));
-    }
     let mut components = Path::new(id).components();
     match components.next() {
         Some(Component::Normal(_)) => {}

@@ -35,7 +35,7 @@ pub enum Error {
     #[error("not initialised: .dkod/ missing at {0}")]
     NotInitialised(PathBuf),
 
-    #[error("invalid component: {0:?}")]
+    #[error("invalid component: {0}")]
     InvalidComponent(String),
 }
 
