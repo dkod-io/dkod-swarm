@@ -33,6 +33,13 @@ fn plan_on_tiny_rust_partitions_disconnected_fns() {
     assert!(names.contains(&"a"));
     assert!(names.contains(&"b"));
     assert!(names.contains(&"c"));
+
+    let g_single = resp
+        .groups
+        .iter()
+        .find(|g| g.symbols.len() == 1)
+        .expect("singleton group");
+    assert_eq!(g_single.symbols[0].qualified_name, "d");
 }
 
 #[test]

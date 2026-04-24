@@ -5,25 +5,27 @@ use dkod_orchestrator::partition::partition;
 use dkod_orchestrator::symbols::extract_rust_file;
 use std::path::{Path, PathBuf};
 
-/// Canonicalise `rel` against `repo_root` and reject anything that escapes
-/// the repo. Defends against three shapes of malicious input from an MCP
-/// caller: (a) absolute paths, (b) `..` traversal, (c) symlinks pointing
-/// outside the repo.
-fn resolve_under_repo(repo_root: &Path, rel: &Path) -> Result<PathBuf> {
+/// Canonicalise `rel` against an already-canonicalised `canonical_repo` and
+/// reject anything that escapes the repo. Defends against three shapes of
+/// malicious input from an MCP caller: (a) absolute paths, (b) `..`
+/// traversal, (c) symlinks pointing outside the repo. The caller is
+/// expected to pass `ctx.repo_root` through `canonicalize` once per
+/// `build_plan` invocation — hoisting the canonicalise call out of this
+/// per-file path avoids N redundant `realpath()` syscalls on large requests.
+fn resolve_under_repo(canonical_repo: &Path, rel: &Path) -> Result<PathBuf> {
     if rel.is_absolute() {
         return Err(Error::InvalidArg(format!(
             "path must be relative to the repo root, got absolute: {}",
             rel.display()
         )));
     }
-    let canonical_repo = std::fs::canonicalize(repo_root).map_err(Error::Io)?;
     let canonical_target = std::fs::canonicalize(canonical_repo.join(rel)).map_err(|e| {
         Error::InvalidArg(format!(
             "cannot resolve {} under repo root: {e}",
             rel.display()
         ))
     })?;
-    if !canonical_target.starts_with(&canonical_repo) {
+    if !canonical_target.starts_with(canonical_repo) {
         return Err(Error::InvalidArg(format!(
             "path escapes repo root: {} resolves to {}",
             rel.display(),
@@ -43,10 +45,11 @@ pub fn build_plan(ctx: &ServerCtx, req: PlanRequest) -> Result<PlanResponse> {
     if req.target_groups == 0 {
         return Err(Error::InvalidArg("target_groups must be >= 1".into()));
     }
+    let canonical_repo = std::fs::canonicalize(&ctx.repo_root).map_err(Error::Io)?;
     let mut all_symbols = Vec::new();
     let mut all_edges = Vec::new();
     for rel in &req.files {
-        let abs = resolve_under_repo(&ctx.repo_root, rel)?;
+        let abs = resolve_under_repo(&canonical_repo, rel)?;
         let bytes = std::fs::read(&abs).map_err(Error::Io)?;
         let (syms, edges) = extract_rust_file(&bytes, &abs)?;
         all_symbols.extend(syms);
