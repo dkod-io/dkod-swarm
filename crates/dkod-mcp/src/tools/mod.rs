@@ -1,3 +1,4 @@
+pub mod abort;
 pub mod execute_begin;
 pub mod plan;
 
@@ -74,6 +75,17 @@ impl McpServer {
             .await
             .map(Json)
             .map_err(Into::into)
+    }
+
+    #[tool(
+        description = "Abort the active session: destroy dk/<sid>, mark the manifest Aborted, and clear the in-memory session + file-lock state."
+    )]
+    pub async fn dkod_abort(
+        &self,
+    ) -> std::result::Result<Json<crate::schema::AbortResponse>, rmcp::ErrorData> {
+        // Same rationale as `dkod_execute_begin`: brief sync git + I/O, no
+        // need for `spawn_blocking` in M2.
+        abort::abort(&self.ctx).await.map(Json).map_err(Into::into)
     }
 }
 

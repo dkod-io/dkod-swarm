@@ -81,3 +81,51 @@ async fn execute_begin_rejects_empty_groups() {
     let err = execute_begin(&ctx, req).await.unwrap_err();
     assert!(matches!(err, dkod_mcp::Error::InvalidArg(_)));
 }
+
+#[tokio::test]
+async fn abort_destroys_branch_and_clears_session() {
+    let (_tmp, root) = init_tempo_repo();
+    let ctx = Arc::new(ServerCtx::new(&root));
+    let req = ExecuteBeginRequest {
+        task_prompt: "demo".into(),
+        groups: vec![GroupInput {
+            id: "g1".into(),
+            symbols: vec![],
+            agent_prompt: "x".into(),
+        }],
+    };
+    let begin = execute_begin(&ctx, req).await.unwrap();
+
+    // Seed a bogus file-lock entry so we can verify abort clears the table.
+    let _ = ctx.file_lock(&root.join("marker")).await;
+
+    let abort_resp = dkod_mcp::tools::abort::abort(&ctx).await.expect("abort");
+    assert_eq!(abort_resp.session_id, begin.session_id);
+
+    assert!(ctx.active_session.lock().await.is_none());
+    assert!(
+        ctx.file_locks.lock().await.is_empty(),
+        "abort should drop the file-lock table"
+    );
+    // dk-branch gone.
+    let br = std::process::Command::new("git")
+        .args(["branch", "--list", &begin.dk_branch])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(String::from_utf8(br.stdout).unwrap().trim().is_empty());
+
+    // Manifest marked Aborted — recovery must not pick it back up.
+    use dkod_worktree::{Manifest, SessionId, SessionStatus};
+    let sid = SessionId::from_raw(&begin.session_id);
+    let m = Manifest::load(&ctx.paths, &sid).expect("manifest still loadable");
+    assert_eq!(m.status, SessionStatus::Aborted);
+}
+
+#[tokio::test]
+async fn abort_without_session_errors() {
+    let (_tmp, root) = init_tempo_repo();
+    let ctx = Arc::new(ServerCtx::new(&root));
+    let err = dkod_mcp::tools::abort::abort(&ctx).await.unwrap_err();
+    assert!(matches!(err, dkod_mcp::Error::NoActiveSession));
+}
