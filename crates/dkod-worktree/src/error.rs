@@ -34,6 +34,9 @@ pub enum Error {
 
     #[error("not initialised: .dkod/ missing at {0}")]
     NotInitialised(PathBuf),
+
+    #[error("invalid component: {0:?}")]
+    InvalidComponent(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
