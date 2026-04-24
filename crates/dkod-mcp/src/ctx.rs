@@ -14,9 +14,12 @@ pub struct ServerCtx {
     pub repo_root: PathBuf,
     pub paths: Paths,
     pub active_session: Mutex<Option<SessionId>>,
-    /// Per-file locks guarding `dkod_write_symbol`. Keyed by canonicalized
-    /// absolute path. Entries are created on first write to a file and live
-    /// until the session ends (we intentionally do not GC mid-session).
+    /// Per-file locks guarding `dkod_write_symbol`. Keys are the absolute
+    /// paths supplied by the caller; the caller is responsible for
+    /// canonicalising (`std::fs::canonicalize` or equivalent) before invoking
+    /// `file_lock` so that symlinks and `./` prefixes do not create duplicate
+    /// entries. Entries are created on first write to a file and live until
+    /// the session ends (we intentionally do not GC mid-session).
     pub file_locks: Mutex<HashMap<PathBuf, Arc<Mutex<()>>>>,
 }
 
@@ -30,8 +33,12 @@ impl ServerCtx {
         }
     }
 
-    /// Fetch or create the lock for `abs_path`. Returns an `Arc<Mutex<()>>`
-    /// that the caller can `.lock().await` independently of the map.
+    /// Fetch or create the lock for `abs_path`. The caller must pass a path
+    /// that is already in whatever canonical form they will use consistently
+    /// — two calls with different representations of the same file (symlink
+    /// vs target, absolute vs relative) will receive distinct locks. Returns
+    /// an `Arc<Mutex<()>>` that the caller can `.lock().await` independently
+    /// of the map.
     pub async fn file_lock(&self, abs_path: &Path) -> Arc<Mutex<()>> {
         let mut map = self.file_locks.lock().await;
         map.entry(abs_path.to_path_buf())
