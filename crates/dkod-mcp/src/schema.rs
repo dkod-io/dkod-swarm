@@ -44,3 +44,39 @@ pub struct PlanResponse {
     /// dependencies).
     pub unresolved_edges: usize,
 }
+
+/// Mirror of `dkod_worktree::SymbolRef` with a `JsonSchema` derive so it can
+/// traverse the MCP boundary. Kept as a separate type (rather than deriving
+/// `JsonSchema` on the worktree type) to avoid forcing a rmcp/schemars
+/// dependency on `dkod-worktree`.
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct SymbolRefSchema {
+    pub qualified_name: String,
+    pub file_path: PathBuf,
+    pub kind: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct GroupInput {
+    pub id: String,
+    pub symbols: Vec<SymbolRefSchema>,
+    pub agent_prompt: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct ExecuteBeginRequest {
+    pub task_prompt: String,
+    pub groups: Vec<GroupInput>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct ExecuteBeginResponse {
+    pub session_id: String,
+    pub dk_branch: String,
+    pub group_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct AbortResponse {
+    pub session_id: String,
+}
