@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/dkod-worktree",
     "crates/dkod-orchestrator",
+    "crates/dkod-mcp",
 ]
 
 [workspace.package]
@@ -21,6 +22,11 @@ anyhow = "1"
 tempfile = "3"
 dk-core = "0.3"
 dk-engine = "0.3"
+rmcp = { version = "1.5", features = ["server", "client", "macros", "transport-io"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "io-std", "process", "time"] }
+schemars = "0.8"
+async-trait = "0.1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 
 [profile.dev]
 # keep default
