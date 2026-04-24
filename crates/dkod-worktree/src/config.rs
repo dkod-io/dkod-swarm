@@ -21,6 +21,8 @@ impl Config {
 
     pub fn save(&self, path: &Path) -> Result<()> {
         let text = toml::to_string_pretty(self)?;
+        // Bare relative filenames (e.g. "config.toml") have Some("") as their
+        // parent; create_dir_all("") fails. Skip the create in that case.
         if let Some(parent) = path.parent()
             && !parent.as_os_str().is_empty()
         {
