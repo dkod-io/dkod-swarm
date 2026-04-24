@@ -1,1 +1,2 @@
-// Placeholder — implementation in PR M1-5+
+pub mod error;
+pub use error::{Error, Result};
