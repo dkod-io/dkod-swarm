@@ -36,7 +36,7 @@ Fixed workflow for every code change. Do **not** short-circuit it.
 4. **Only then commit and open the PR.** One logical unit per PR.
 5. **Wait for CodeRabbit's PR review** to post on the PR.
 6. **Run `/coderabbit:autofix`** to apply CodeRabbit's PR-side fixes. Iterate (re-review → autofix) until the PR is clean.
-7. **Then ask to merge.** Never merge with open CodeRabbit issues.
+7. **Merge autonomously** once the PR is clean: `gh pr merge <n> --merge --delete-branch`. Do not pause for a human. During a running milestone, proceed straight to the next PR. The hard bar is zero open CodeRabbit findings, zero spec-compliance issues, and zero blocking code-quality issues. "Close enough" is never enough — if an issue cannot be resolved cleanly, STOP and ask the human rather than merge through ambiguity.
 
 **Docs-only commits** (`.md`/`.toml`/`.yaml`-only changesets) skip CodeRabbit — it doesn't meaningfully review those. State that explicitly rather than claiming a clean review.
 
