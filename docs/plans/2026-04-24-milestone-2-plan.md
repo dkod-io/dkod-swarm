@@ -20,7 +20,7 @@ Two external APIs M2 leans on. Both are version-pinned to what crates.io exposes
   - `#[tool_router]` (no arguments in the probe) decorates an `impl MyServer` block; the decorated struct must own a `tool_router: ToolRouter<MyServer>` field. `#[tool_handler] impl ServerHandler for MyServer {}` wires the router into the MCP `ServerHandler` trait.
   - `#[tool(description = "…")]` methods take `&self` + `rmcp::handler::server::wrapper::Parameters<T>` where `T: serde::Deserialize + schemars::JsonSchema`, and return `Result<_, rmcp::ErrorData>` (note: `ErrorData`, not `Error` — the probe confirms this).
   - `rmcp` re-exports `schemars` at the crate root, so downstream code uses `rmcp::schemars::JsonSchema` (or adds a direct `schemars` dep, which the workspace does).
-  - Client side (needed by the in-process test harness in Task 4): `()` implements `ClientHandler`, so `().into_dyn()` yields a `Box<dyn DynService<RoleClient>>`, and `.serve(client_io).await` drives the handshake. `ServiceExt::into_dyn` (returns `Box<dyn DynService<R>>`) is the documented way to erase the concrete handler type.
+  - Client-side (needed by the in-process test harness in Task 4): `()` implements `ClientHandler`, so `().into_dyn()` yields a `Box<dyn DynService<RoleClient>>`, and `.serve(client_io).await` drives the handshake. `ServiceExt::into_dyn` (returns `Box<dyn DynService<R>>`) is the documented way to erase the concrete handler type.
   - **Pitfall:** the `tool_router` struct field looks unused to dead-code analysis because the `#[tool_router]` macro consults it from a generated `Self::tool_router()` ctor. Either mark the field `#[allow(dead_code)]` or treat the warning as expected.
   - **Probe-verified assertion technique:** writing `fn _assert_service_ext<S: ServiceExt<RoleServer>>(_: &S) {}` followed by `_assert_service_ext(&server)` compiles iff the blanket impl resolves — cleaner than trying to spell the full `serve` signature, which requires three generic args (`T`, `E`, `A`) that can't be inferred without a real transport argument.
 - **`gh` CLI** — used only by `dkod_pr`. Three invocations:
@@ -592,13 +592,17 @@ pub fn d() {}
 #![allow(dead_code)] // harness; each test file uses a subset
 
 use dkod_mcp::{McpServer, ServerCtx};
-use rmcp::{RoleClient, ServiceExt, service::RunningService};
+use rmcp::{
+    RoleClient, ServiceExt,
+    service::{DynService, RunningService},
+};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 
-/// Initialise a fresh bare git repo in a tempdir, seed one commit on `main`
-/// with `tests/fixtures/tiny_rust/src/lib.rs`, and return the repo path.
+/// Initialise a fresh git repo in a tempdir (non-bare, working-tree form),
+/// seed one commit on `main` with `tests/fixtures/tiny_rust/src/lib.rs`, and
+/// return the repo path.
 pub fn init_tempo_repo() -> (tempfile::TempDir, PathBuf) {
     let tmp = tempfile::tempdir().expect("tempdir");
     let root = tmp.path().to_path_buf();
@@ -628,18 +632,19 @@ pub fn init_tempo_repo() -> (tempfile::TempDir, PathBuf) {
 /// connected to it via an in-memory duplex transport.
 pub async fn spawn_in_process_server(
     repo_root: &Path,
-) -> RunningService<RoleClient, rmcp::model::InitializeRequestParam> {
+) -> RunningService<RoleClient, Box<dyn DynService<RoleClient>>> {
     // rmcp supports arbitrary `AsyncRead + AsyncWrite` transports; a pair of
     // `tokio::io::duplex` streams gives us an in-process client/server link
-    // without touching real stdio. The exact wiring is confirmed in the
-    // probe in Task 1 — if the rmcp API differs, adapt here and in every
-    // later integration test that calls this fn.
+    // without touching real stdio. Confirmed by the rmcp-1.5 probe in Task 1 —
+    // the client-side `().into_dyn().serve(io)` form is what the probe proved.
     let (client_io, server_io) = tokio::io::duplex(64 * 1024);
     let ctx = Arc::new(ServerCtx::new(repo_root));
     let server = McpServer::new(ctx);
-    let _running_server = tokio::spawn(async move {
+    tokio::spawn(async move {
         let svc = server.serve(server_io).await.expect("server serve");
-        svc.waiting().await.ok();
+        if let Err(e) = svc.waiting().await {
+            eprintln!("dkod-mcp test server exited with error: {e:?}");
+        }
     });
     ().into_dyn()
         .serve(client_io)
