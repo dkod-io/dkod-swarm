@@ -6,7 +6,7 @@ use tempfile::TempDir;
 fn group_spec_roundtrips() {
     let tmp = TempDir::new().unwrap();
     let paths = Paths::new(tmp.path());
-    let sid = SessionId::from("sess-abc");
+    let sid = SessionId::from_raw("sess-abc");
     let gid = "g1";
 
     let spec = GroupSpec {
@@ -33,7 +33,7 @@ fn group_spec_roundtrips() {
 fn write_log_appends_as_jsonl_and_reads_back_in_order() {
     let tmp = TempDir::new().unwrap();
     let paths = Paths::new(tmp.path());
-    let sid = SessionId::from("sess-abc");
+    let sid = SessionId::from_raw("sess-abc");
     let gid = "g1";
 
     let log = WriteLog::open(&paths, &sid, gid).unwrap();
@@ -48,7 +48,18 @@ fn write_log_appends_as_jsonl_and_reads_back_in_order() {
         timestamp: "2026-04-24T12:00:01Z".into(),
     }).unwrap();
 
-    let rows = WriteLog::read_all(&paths, &sid, gid).unwrap();
+    // Verify the on-disk file is genuinely newline-delimited JSON, not some
+    // other serialization form that happens to roundtrip.
+    let raw_path = paths.group_writes(sid.as_str(), gid).unwrap();
+    let raw = std::fs::read_to_string(&raw_path).unwrap();
+    let lines: Vec<&str> = raw.lines().collect();
+    assert_eq!(lines.len(), 2, "expected exactly two JSONL lines, got: {raw:?}");
+    for line in &lines {
+        assert!(line.starts_with('{') && line.ends_with('}'),
+            "JSONL line is not a JSON object: {line:?}");
+    }
+
+    let rows = log.read_all().unwrap();
     assert_eq!(rows.len(), 2);
     assert_eq!(rows[0].symbol, "auth::login");
     assert_eq!(rows[1].symbol, "auth::logout");

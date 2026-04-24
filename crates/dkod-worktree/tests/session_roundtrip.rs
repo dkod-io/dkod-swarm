@@ -17,7 +17,7 @@ fn session_id_is_stable_short_string() {
 fn manifest_roundtrips_through_disk() {
     let tmp = TempDir::new().unwrap();
     let paths = Paths::new(tmp.path());
-    let sid = SessionId::from("sess-abc");
+    let sid = SessionId::from_raw("sess-abc");
 
     let m = Manifest {
         session_id: sid.clone(),

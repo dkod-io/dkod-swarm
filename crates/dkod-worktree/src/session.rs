@@ -6,31 +6,41 @@ use std::fmt;
 pub struct SessionId(String);
 
 impl SessionId {
-    /// Generate a new session id: `sess-<12 hex chars>`.
+    /// Generate a new session id: `sess-<16 hex from clock>-<4 hex counter>`.
     ///
-    /// Uses nanoseconds from the system clock. No crypto guarantees;
-    /// session ids are not secrets. Collision-safe for single-user sessions
-    /// that are not created in rapid succession.
+    /// Combines `SystemTime` (low 64 bits of nanos — wraps only after ~584
+    /// years) with a process-local atomic counter, guaranteeing different
+    /// values for two `generate()` calls within the same process even if
+    /// they happen within a single clock tick. No crypto guarantees;
+    /// session ids are not secrets.
     pub fn generate() -> Self {
+        use std::sync::atomic::{AtomicU64, Ordering};
         use std::time::{SystemTime, UNIX_EPOCH};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_nanos())
+            .map(|d| d.as_nanos() as u64)
             .unwrap_or(0);
-        // 12 hex chars = 48 bits — collision-safe for single-user sessions.
-        let s = format!("sess-{:012x}", nanos & 0xffff_ffff_ffff);
-        Self(s)
+        let c = COUNTER.fetch_add(1, Ordering::Relaxed) & 0xffff;
+        Self(format!("sess-{nanos:016x}-{c:04x}"))
     }
+
+    /// Wrap a raw string as a `SessionId` without validating it.
+    ///
+    /// Validation of id components (no path separators, no `..`, etc.) happens
+    /// at the boundary where an id is turned into a filesystem path — inside
+    /// `Paths::session`, `Paths::manifest`, and friends. This constructor
+    /// deliberately does NOT validate because it has no `Paths` context and
+    /// must be cheap for deserialization paths. Callers accepting ids from
+    /// untrusted sources must pass the resulting id through a `Paths` method
+    /// before joining it to anything filesystem-backed.
+    pub fn from_raw(s: &str) -> Self { Self(s.to_string()) }
 
     pub fn as_str(&self) -> &str { &self.0 }
 }
 
 impl fmt::Display for SessionId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str(&self.0) }
-}
-
-impl From<&str> for SessionId {
-    fn from(s: &str) -> Self { Self(s.to_string()) }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -83,16 +83,15 @@ impl WriteLog {
             .map_err(|e| Error::Io { path: self.path.clone(), source: e })
     }
 
-    pub fn read_all(paths: &Paths, sid: &SessionId, gid: &str) -> Result<Vec<WriteRecord>> {
-        let path = paths.group_writes(sid.as_str(), gid)?;
-        let f = std::fs::File::open(&path)
-            .map_err(|e| Error::Io { path: path.clone(), source: e })?;
+    pub fn read_all(&self) -> Result<Vec<WriteRecord>> {
+        let f = std::fs::File::open(&self.path)
+            .map_err(|e| Error::Io { path: self.path.clone(), source: e })?;
         let mut out = Vec::new();
         for line in BufReader::new(f).lines() {
-            let line = line.map_err(|e| Error::Io { path: path.clone(), source: e })?;
+            let line = line.map_err(|e| Error::Io { path: self.path.clone(), source: e })?;
             if line.trim().is_empty() { continue; }
             let rec: WriteRecord = serde_json::from_str(&line)
-                .map_err(|e| Error::Json { path: path.clone(), source: e })?;
+                .map_err(|e| Error::Json { path: self.path.clone(), source: e })?;
             out.push(rec);
         }
         Ok(out)
