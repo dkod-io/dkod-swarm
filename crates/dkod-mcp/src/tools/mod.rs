@@ -44,9 +44,7 @@ impl McpServer {
         &self,
         Parameters(req): Parameters<crate::schema::PlanRequest>,
     ) -> std::result::Result<Json<crate::schema::PlanResponse>, rmcp::ErrorData> {
-        plan::build_plan(&self.ctx, req)
-            .map(Json)
-            .map_err(plan::to_rmcp_error)
+        plan::build_plan(&self.ctx, req).map(Json).map_err(Into::into)
     }
 }
 

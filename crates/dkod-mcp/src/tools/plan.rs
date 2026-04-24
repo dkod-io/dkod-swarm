@@ -5,6 +5,12 @@ use dkod_orchestrator::partition::partition;
 use dkod_orchestrator::symbols::extract_rust_file;
 
 /// Pure helper used by both the MCP wrapper and unit tests.
+///
+/// M2 scope note: file reads here are synchronous `std::fs::read`. For the
+/// small fixtures M2 exercises this is fine on the async runtime; later
+/// milestones that scale to a full Rust crate should wrap this in
+/// `tokio::task::spawn_blocking` so the executor thread is not held while
+/// the partitioner runs on cold caches.
 pub fn build_plan(ctx: &ServerCtx, req: PlanRequest) -> Result<PlanResponse> {
     if req.target_groups == 0 {
         return Err(Error::InvalidArg("target_groups must be >= 1".into()));
@@ -49,9 +55,4 @@ pub fn build_plan(ctx: &ServerCtx, req: PlanRequest) -> Result<PlanResponse> {
         warnings,
         unresolved_edges: graph.unresolved_count(),
     })
-}
-
-/// Map `dkod_mcp::Error` to `rmcp::ErrorData` preserving the message.
-pub(crate) fn to_rmcp_error(e: Error) -> rmcp::ErrorData {
-    rmcp::ErrorData::internal_error(e.to_string(), None)
 }
