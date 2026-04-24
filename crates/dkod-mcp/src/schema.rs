@@ -1,3 +1,4 @@
+use rmcp::schemars;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
