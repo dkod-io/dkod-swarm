@@ -44,8 +44,15 @@ impl GroupSpec {
         let path = paths.group_spec(sid.as_str(), gid)?;
         let bytes = std::fs::read(&path)
             .map_err(|e| Error::Io { path: path.clone(), source: e })?;
-        serde_json::from_slice(&bytes)
-            .map_err(|e| Error::Json { path, source: e })
+        let spec: Self = serde_json::from_slice(&bytes)
+            .map_err(|e| Error::Json { path: path.clone(), source: e })?;
+        if spec.id != gid {
+            return Err(Error::Invalid(format!(
+                "group id mismatch at {}: expected {gid:?}, on-disk id is {:?}",
+                path.display(), spec.id
+            )));
+        }
+        Ok(spec)
     }
 }
 
@@ -84,8 +91,13 @@ impl WriteLog {
     }
 
     pub fn read_all(&self) -> Result<Vec<WriteRecord>> {
-        let f = std::fs::File::open(&self.path)
-            .map_err(|e| Error::Io { path: self.path.clone(), source: e })?;
+        let f = match std::fs::File::open(&self.path) {
+            Ok(f) => f,
+            // A never-written log is semantically empty — callers resuming
+            // a session should not care whether `append` ever ran.
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => return Err(Error::Io { path: self.path.clone(), source: e }),
+        };
         let mut out = Vec::new();
         for line in BufReader::new(f).lines() {
             let line = line.map_err(|e| Error::Io { path: self.path.clone(), source: e })?;

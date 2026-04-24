@@ -78,7 +78,14 @@ impl Manifest {
         let path = paths.manifest(sid.as_str())?;
         let bytes = std::fs::read(&path)
             .map_err(|e| Error::Io { path: path.clone(), source: e })?;
-        serde_json::from_slice(&bytes)
-            .map_err(|e| Error::Json { path, source: e })
+        let manifest: Self = serde_json::from_slice(&bytes)
+            .map_err(|e| Error::Json { path: path.clone(), source: e })?;
+        if manifest.session_id.as_str() != sid.as_str() {
+            return Err(Error::Invalid(format!(
+                "session id mismatch at {}: expected {:?}, on-disk id is {:?}",
+                path.display(), sid.as_str(), manifest.session_id.as_str()
+            )));
+        }
+        Ok(manifest)
     }
 }
