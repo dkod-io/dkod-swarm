@@ -68,3 +68,26 @@ fn syntactically_invalid_replacement_yields_fallback() {
         }
     }
 }
+
+// Documented behaviour: a rename (different symbol name in replacement) yields
+// Fallback because the tightened heuristic requires the SAME qualified_name to
+// appear in the re-parse.  Callers must pass the new name as `qualified_name`
+// if they want to introduce a rename — design §edge case #5.
+#[test]
+fn rename_in_replacement_yields_fallback() {
+    let src = b"pub fn hello() -> i32 { 1 }\n";
+    // Replacement has a different function name — syntactically valid Rust but
+    // the original symbol "hello" is no longer present.
+    let outcome = replace_symbol(src, "hello", "pub fn hello_v2() -> i32 { 1 }").unwrap();
+    match outcome {
+        ReplaceOutcome::Fallback { reason, .. } => {
+            assert!(
+                reason.contains("hello"),
+                "reason should mention the missing symbol; got: {reason}"
+            );
+        }
+        ReplaceOutcome::ParsedOk { .. } => {
+            panic!("rename must not be reported as ParsedOk (tightened heuristic)")
+        }
+    }
+}
