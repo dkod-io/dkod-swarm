@@ -19,6 +19,10 @@ async fn main() {
 async fn run() -> anyhow::Result<()> {
     let repo_root = std::env::current_dir()?;
     let ctx = Arc::new(ServerCtx::new(&repo_root));
+    // Adopt any Executing session left behind by a previous process before
+    // accepting MCP traffic — per design `§State`, a restart must resume
+    // rather than start fresh.
+    ctx.recover().await?;
     let service = McpServer::new(ctx).serve(stdio()).await?;
     service.waiting().await?;
     Ok(())
