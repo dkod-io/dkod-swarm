@@ -6,4 +6,5 @@
 //! fallible. Confirmed by `examples/probe_engine_api.rs`.
 
 pub mod error;
+pub mod symbols;
 pub use error::{Error, Result};
