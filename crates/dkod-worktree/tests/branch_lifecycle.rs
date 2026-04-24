@@ -1,4 +1,4 @@
-use dkod_worktree::branch;
+use dkod_worktree::{branch, Error};
 use std::process::Command;
 use tempfile::TempDir;
 
@@ -71,4 +71,22 @@ fn commit_on_dk_branch_uses_enforced_identity() {
         .unwrap();
     let line = String::from_utf8_lossy(&out.stdout).trim().to_string();
     assert_eq!(line, "Haim Ari <haimari1@gmail.com> | Haim Ari <haimari1@gmail.com> | group g1: initial land");
+}
+
+#[test]
+fn create_and_destroy_reject_invalid_session_id() {
+    let tmp = TempDir::new().unwrap();
+    init_repo(tmp.path());
+
+    // Both entry points must surface Error::InvalidComponent for ids that
+    // would otherwise construct `dk/../escape` or similar. This keeps the
+    // validation contract consistent with Paths::session.
+    for bad in ["..", "a/b", "/absolute"] {
+        let err = branch::create_dk_branch(tmp.path(), "main", bad).unwrap_err();
+        assert!(matches!(err, Error::InvalidComponent(_)),
+            "create_dk_branch({bad:?}) → {err:?}");
+        let err = branch::destroy_dk_branch(tmp.path(), "main", bad).unwrap_err();
+        assert!(matches!(err, Error::InvalidComponent(_)),
+            "destroy_dk_branch({bad:?}) → {err:?}");
+    }
 }

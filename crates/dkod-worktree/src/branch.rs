@@ -81,7 +81,13 @@ pub fn detect_main(repo: &Path) -> Result<String> {
 }
 
 /// Create `dk/<session_id>` off `main` and check it out.
+///
+/// `session_id` is validated through `paths::validate_id` so callers get the
+/// same `Error::InvalidComponent` surface they do from `Paths::session` —
+/// without this check a malformed id would bubble out as a cryptic
+/// `Error::Git` from git's own refname parser.
 pub fn create_dk_branch(repo: &Path, main: &str, session_id: &str) -> Result<()> {
+    crate::paths::validate_id(session_id)?;
     let name = dk_branch_name(session_id);
     git(repo, &["checkout", "-b", &name, main])?;
     Ok(())
@@ -89,7 +95,10 @@ pub fn create_dk_branch(repo: &Path, main: &str, session_id: &str) -> Result<()>
 
 /// Check out `main` and delete `dk/<session_id>` with `-D` (force-delete, as
 /// dk-branches are ephemeral and may not be merged into the default branch).
+///
+/// `session_id` is validated the same way as in `create_dk_branch`.
 pub fn destroy_dk_branch(repo: &Path, main: &str, session_id: &str) -> Result<()> {
+    crate::paths::validate_id(session_id)?;
     let name = dk_branch_name(session_id);
     // Move off the dk-branch before deleting it.
     git(repo, &["checkout", main])?;
