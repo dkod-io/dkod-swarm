@@ -5,6 +5,7 @@
 //! bare-value constructor; actual signature wraps the config in a `Box` and is
 //! fallible. Confirmed by `examples/probe_engine_api.rs`.
 
+pub mod callgraph;
 pub mod error;
 pub mod symbols;
 pub use error::{Error, Result};
