@@ -65,16 +65,16 @@ fn git_with_identity(repo: &Path, args: &[&str]) -> Result<String> {
 ///    detached-HEAD mode without a remote).
 pub fn detect_main(repo: &Path) -> Result<String> {
     // Tier 1: symbolic HEAD → named branch.
-    if let Ok(head) = git(repo, &["rev-parse", "--abbrev-ref", "HEAD"]) {
-        if head != "HEAD" {
-            return Ok(head);
-        }
+    if let Ok(head) = git(repo, &["rev-parse", "--abbrev-ref", "HEAD"])
+        && head != "HEAD"
+    {
+        return Ok(head);
     }
     // Tier 2: origin/HEAD.
-    if let Ok(sym) = git(repo, &["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]) {
-        if let Some(stripped) = sym.strip_prefix("origin/") {
-            return Ok(stripped.to_string());
-        }
+    if let Ok(sym) = git(repo, &["symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
+        && let Some(stripped) = sym.strip_prefix("origin/")
+    {
+        return Ok(stripped.to_string());
     }
     // Tier 3: literal fallback.
     Ok("main".to_string())
