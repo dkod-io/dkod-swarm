@@ -8,5 +8,6 @@
 pub mod callgraph;
 pub mod error;
 pub mod partition;
+pub mod replace;
 pub mod symbols;
 pub use error::{Error, Result};
