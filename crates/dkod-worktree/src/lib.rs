@@ -1,11 +1,14 @@
+pub mod branch;
 pub mod config;
 pub mod error;
 pub mod group;
 mod io_util;
+pub mod init;
 pub mod paths;
 pub mod session;
 pub use config::Config;
 pub use error::{Error, Result};
 pub use group::{GroupSpec, GroupStatus, SymbolRef, WriteLog, WriteRecord};
+pub use init::init_repo;
 pub use paths::Paths;
 pub use session::{Manifest, SessionId, SessionStatus};

@@ -11,7 +11,7 @@ pub struct Paths {
 ///
 /// Rejects absolute paths, path separators, `..` traversals, and any string
 /// whose only component is not a plain `Normal` segment.
-fn validate_id(id: &str) -> Result<()> {
+pub(crate) fn validate_id(id: &str) -> Result<()> {
     let mut components = Path::new(id).components();
     match components.next() {
         Some(Component::Normal(_)) => {}
