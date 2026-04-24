@@ -21,3 +21,10 @@ pub fn validate() -> bool { true }
     let found = calls.iter().any(|c| c.caller_name.contains("login") && c.callee_name.contains("validate"));
     assert!(found, "expected login -> validate edge; got {calls:?}");
 }
+
+#[test]
+fn empty_source_returns_empty_vectors_without_parsing() {
+    let (syms, calls) = extract_rust_file(b"", std::path::Path::new("empty.rs")).unwrap();
+    assert!(syms.is_empty());
+    assert!(calls.is_empty());
+}

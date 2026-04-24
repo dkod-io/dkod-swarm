@@ -11,6 +11,14 @@ use std::path::Path;
 /// that tree-sitter cannot process — tree-sitter itself tolerates most
 /// byte sequences, but query compilation failures are surfaced here).
 pub fn extract_rust_file(source: &[u8], file_path: &Path) -> Result<(Vec<Symbol>, Vec<RawCallEdge>)> {
+    // Honour the empty-source contract up-front — skip parser construction
+    // entirely so the zero-symbol outcome is cheap and observably deterministic.
+    if source.is_empty() {
+        return Ok((Vec::new(), Vec::new()));
+    }
+    // FIXME(M1-6): parser construction compiles tree-sitter queries on every
+    // call. M1-6's callgraph builder will parse N files in a loop; hoist the
+    // `QueryDrivenParser` construction to a batch-level helper before then.
     let parser = QueryDrivenParser::new(Box::new(RustConfig))
         .map_err(|e| Error::Engine(format!("build parser: {e}")))?;
     let symbols = parser
