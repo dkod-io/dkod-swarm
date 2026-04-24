@@ -6,11 +6,13 @@ fn session_id_is_stable_short_string() {
     let a = SessionId::generate();
     let b = SessionId::generate();
     assert_ne!(a.as_str(), b.as_str());
-    assert!(a.as_str().len() >= 8, "session id too short");
-    assert!(
-        a.as_str().chars().all(|c| c.is_ascii_alphanumeric() || c == '-'),
-        "session id must be filesystem-safe: got {:?}", a.as_str()
-    );
+    for (label, id) in [("a", &a), ("b", &b)] {
+        assert!(id.as_str().len() >= 8, "{label}: session id too short: {:?}", id.as_str());
+        assert!(
+            id.as_str().chars().all(|c| c.is_ascii_alphanumeric() || c == '-'),
+            "{label}: session id must be filesystem-safe: got {:?}", id.as_str()
+        );
+    }
 }
 
 #[test]
