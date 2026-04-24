@@ -36,9 +36,9 @@ Fixed workflow for every code change. Do **not** short-circuit it.
 4. **Only then commit and open the PR.** One logical unit per PR.
 5. **Wait for CodeRabbit's PR review** to post on the PR.
 6. **Run `/coderabbit:autofix`** to apply CodeRabbit's PR-side fixes. Iterate (re-review → autofix) until the PR is clean.
-7. **Then ask to merge.** Never merge with open CodeRabbit issues.
+7. **Merge autonomously** once the gates are clean: `gh pr merge <n> --merge --delete-branch`. Do not pause for a human. During a running milestone, proceed straight to the next PR. The hard bar is: **(a)** the CodeRabbit gate — zero open findings when CodeRabbit actually ran; if CodeRabbit was skipped by the docs-only rule below, treat this gate as automatically clean — **(b)** zero spec-compliance issues, **(c)** zero blocking code-quality issues. "Close enough" is never enough — if a finding cannot be resolved cleanly, use the stop-and-ask escape hatch instead of merging through ambiguity.
 
-**Docs-only commits** (`.md`/`.toml`/`.yaml`-only changesets) skip CodeRabbit — it doesn't meaningfully review those. State that explicitly rather than claiming a clean review.
+**Docs-only commits** (`.md`/`.toml`/`.yaml`-only changesets) skip the *local* pre-commit CodeRabbit run — it doesn't meaningfully review those — and skip it in the PR body note. Note that CodeRabbit's PR-side automation may still run and post comments on a docs PR; when it does, treat those findings exactly like any other PR-side findings (autofix + iterate until clean). Only when CodeRabbit genuinely produces no PR-side review (or explicitly skips the file) is the CodeRabbit gate treated as automatically clean.
 
 ## License
 
@@ -63,10 +63,12 @@ Per design §Ship order — do not skip ahead:
 
 ## Stop-and-ask list
 
-- Design-doc ambiguity — don't guess; ask.
-- About to touch a repo outside `dkod-swarm` — don't; ask.
-- PR ready to merge — ask before merging.
-- Think the design itself is wrong — ask; update the doc together first.
+Autonomous merge (review-gate step 7) is the default — do NOT ask before every merge. Stop and ask only when:
+
+- Design-doc ambiguity surfaces — don't guess.
+- About to touch a repo outside `dkod-swarm`.
+- A CodeRabbit or code-quality finding can't be resolved cleanly, or a merge would require unsupervised design judgment.
+- You think the design itself is wrong — ask; update the doc together first.
 
 ## Session bootstrap checklist
 
