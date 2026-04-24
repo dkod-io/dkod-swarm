@@ -6,12 +6,12 @@ use std::fmt;
 pub struct SessionId(String);
 
 impl SessionId {
-    /// Generate a new session id: `sess-<16 hex from clock>-<4 hex counter>`.
+    /// Generate a new session id: `sess-<16 hex clock>-<16 hex counter>`.
     ///
     /// Combines `SystemTime` (low 64 bits of nanos — wraps only after ~584
-    /// years) with a process-local atomic counter, guaranteeing different
-    /// values for two `generate()` calls within the same process even if
-    /// they happen within a single clock tick. No crypto guarantees;
+    /// years) with a full-width process-local atomic counter, guaranteeing
+    /// different values for two `generate()` calls within the same process
+    /// even if they happen within a single clock tick. No crypto guarantees;
     /// session ids are not secrets.
     pub fn generate() -> Self {
         use std::sync::atomic::{AtomicU64, Ordering};
@@ -21,8 +21,8 @@ impl SessionId {
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_nanos() as u64)
             .unwrap_or(0);
-        let c = COUNTER.fetch_add(1, Ordering::Relaxed) & 0xffff;
-        Self(format!("sess-{nanos:016x}-{c:04x}"))
+        let c = COUNTER.fetch_add(1, Ordering::Relaxed);
+        Self(format!("sess-{nanos:016x}-{c:016x}"))
     }
 
     /// Wrap a raw string as a `SessionId` without validating it.
@@ -70,8 +70,7 @@ impl Manifest {
         }
         let json = serde_json::to_vec_pretty(self)
             .map_err(|e| Error::Json { path: path.clone(), source: e })?;
-        std::fs::write(&path, json)
-            .map_err(|e| Error::Io { path, source: e })
+        crate::io_util::write_atomic(&path, &json)
     }
 
     pub fn load(paths: &Paths, sid: &SessionId) -> Result<Self> {

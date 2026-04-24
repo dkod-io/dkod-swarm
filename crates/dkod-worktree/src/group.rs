@@ -36,8 +36,7 @@ impl GroupSpec {
         }
         let json = serde_json::to_vec_pretty(self)
             .map_err(|e| Error::Json { path: path.clone(), source: e })?;
-        std::fs::write(&path, json)
-            .map_err(|e| Error::Io { path, source: e })
+        crate::io_util::write_atomic(&path, &json)
     }
 
     pub fn load(paths: &Paths, sid: &SessionId, gid: &str) -> Result<Self> {

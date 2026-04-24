@@ -29,6 +29,8 @@ fn manifest_roundtrips_through_disk() {
     m.save(&paths).unwrap();
 
     let loaded = Manifest::load(&paths, &sid).unwrap();
+    assert_eq!(loaded.session_id, sid);
+    assert_eq!(loaded.created_at, "2026-04-24T12:00:00Z");
     assert_eq!(loaded.task_prompt, "refactor auth to passkeys");
     assert_eq!(loaded.status, SessionStatus::Planned);
     assert_eq!(loaded.group_ids, vec!["g1", "g2"]);
