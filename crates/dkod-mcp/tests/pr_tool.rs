@@ -286,6 +286,105 @@ exit 99"#,
     assert_eq!(resp.url, "https://github.com/fake/repo/pull/123");
 }
 
+/// Race-window coverage for the **second** idempotency check
+/// (post-push, pre-create). Scenario: the first `gh pr list` returns
+/// nothing (no existing PR), the push succeeds, then a concurrent
+/// process opens a PR before our `gh pr create` runs — our second
+/// `pr_exists` call must catch that and return `was_existing: true`
+/// without invoking `gh pr create`.
+///
+/// Implementation: a stateful `gh` shim that tracks invocation count
+/// across calls. The first `pr list` returns empty; the second returns
+/// a URL. `pr create` exits non-zero so the test fails noisily if
+/// reached.
+#[tokio::test]
+async fn pr_handles_race_when_pr_appears_during_push() {
+    let (_tmp, root) = init_tempo_repo();
+    let ctx = Arc::new(ServerCtx::new(&root));
+    execute_begin(
+        &ctx,
+        ExecuteBeginRequest {
+            task_prompt: "demo".into(),
+            groups: vec![GroupInput {
+                id: "g1".into(),
+                symbols: vec![SymbolRefSchema {
+                    qualified_name: "a".into(),
+                    file_path: PathBuf::from("src/lib.rs"),
+                    kind: "function".into(),
+                }],
+                agent_prompt: "rewrite a".into(),
+            }],
+        },
+    )
+    .await
+    .expect("execute_begin");
+    write_symbol(
+        &ctx,
+        WriteSymbolRequest {
+            group_id: "g1".into(),
+            file: PathBuf::from("src/lib.rs"),
+            qualified_name: "a".into(),
+            new_body: "pub fn a() { /* y */ }".into(),
+        },
+    )
+    .await
+    .expect("write_symbol");
+    commit(&ctx).await.expect("commit");
+
+    // Stateful shim: a counter file on disk distinguishes the first
+    // `pr list` (return empty) from the second (return a URL). `pr
+    // create` exits 99 to make a regression loud.
+    let counter_file = root.join(".gh-list-count");
+    std::fs::write(&counter_file, "0").unwrap();
+    let counter_path = counter_file.display().to_string();
+    let bin_dir = make_gh_shim(
+        &root,
+        &format!(
+            r#"if [ "$1" = "pr" ] && [ "$2" = "list" ]; then
+    n=$(cat "{counter_path}")
+    n=$((n + 1))
+    echo "$n" > "{counter_path}"
+    if [ "$n" = "1" ]; then
+        # First check (pre-push): no existing PR.
+        exit 0
+    else
+        # Second check (post-push): a concurrent process opened one.
+        echo "https://github.com/fake/repo/pull/777"
+        exit 0
+    fi
+elif [ "$1" = "pr" ] && [ "$2" = "create" ]; then
+    echo "shim: pr create must NOT be called when second idempotency check finds a PR" >&2
+    exit 99
+fi
+echo "shim: unhandled gh args: $*" >&2
+exit 99"#
+        ),
+    );
+    install_git_shim(&bin_dir);
+
+    let resp = pr_with_shim(
+        &ctx,
+        PrRequest {
+            title: "t".into(),
+            body: "b".into(),
+        },
+        Some(&bin_dir),
+    )
+    .await
+    .expect("pr_with_shim");
+    assert!(
+        resp.was_existing,
+        "expected was_existing=true (second idempotency check fired), got {resp:?}"
+    );
+    assert_eq!(resp.url, "https://github.com/fake/repo/pull/777");
+
+    // Sanity: the shim was invoked exactly twice for `pr list` (once
+    // before push, once after) — no third call since `pr create` is
+    // skipped.
+    let final_count = std::fs::read_to_string(&counter_file).unwrap();
+    assert_eq!(final_count.trim(), "2", "expected 2 pr-list calls");
+}
+
 #[tokio::test]
 async fn pr_without_active_session_errors() {
     // No `dkod_execute_begin` was called → `pr` must fail fast with

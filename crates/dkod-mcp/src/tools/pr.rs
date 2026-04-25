@@ -29,7 +29,7 @@
 use crate::gh;
 use crate::schema::{PrRequest, PrResponse};
 use crate::{Error, Result, ServerCtx};
-use dkod_worktree::{Config, branch};
+use dkod_worktree::{Config, Paths, SessionId, branch};
 use std::path::Path;
 use std::process::Command;
 
@@ -48,25 +48,64 @@ pub async fn pr_with_shim(
     req: PrRequest,
     path_prefix: Option<&Path>,
 ) -> Result<PrResponse> {
-    // Mirror the rest of the M2 surface: hold the session lock only long
-    // enough to clone the id. Subprocess work below runs without the lock.
+    // Capture the session id on the async path. The subprocess work
+    // (verify_cmd, gh, git push) all runs synchronously on a blocking
+    // thread to keep the tokio executor free, mirroring `dkod_commit`.
     let sid = ctx
         .active_session
         .lock()
         .await
         .clone()
         .ok_or(Error::NoActiveSession)?;
+    let repo_root = ctx.repo_root.clone();
+    let path_prefix_buf = path_prefix.map(Path::to_path_buf);
+    let sid_for_clear = sid.clone();
+
+    // `Paths` (M1 type, not `Clone`) is reconstructed inside the blocking
+    // closure from `repo_root`. `ServerCtx::new` constructs it the same
+    // way, so the value is identical.
+    let resp = tokio::task::spawn_blocking(move || {
+        let paths = Paths::new(&repo_root);
+        pr_inner(&repo_root, &paths, sid, req, path_prefix_buf.as_deref())
+    })
+    .await
+    .map_err(|e| Error::InvalidArg(format!("spawn_blocking join error: {e}")))??;
+
+    // Clear the active session on success — `ServerCtx::active_session`
+    // documents that a successful `dkod_pr` ends the session lifecycle.
+    // Use a compare-then-clear pattern so a concurrent abort that already
+    // started a different session can't be wiped out by us.
+    let mut active = ctx.active_session.lock().await;
+    if active.as_ref().map(|s| s.as_str()) == Some(sid_for_clear.as_str()) {
+        *active = None;
+    }
+
+    Ok(resp)
+}
+
+/// Synchronous core of `dkod_pr`. The async wrappers above offload this
+/// to `tokio::task::spawn_blocking`, matching the M2-6 `dkod_commit`
+/// split (sync inner + async wrapper). Subprocess calls would otherwise
+/// pin the tokio executor thread for as long as `verify_cmd` / `gh` /
+/// `git push` take.
+pub(crate) fn pr_inner(
+    repo_root: &Path,
+    paths: &Paths,
+    sid: SessionId,
+    req: PrRequest,
+    path_prefix: Option<&Path>,
+) -> Result<PrResponse> {
     let branch_name = branch::dk_branch_name(sid.as_str());
 
     // 1. Run verify_cmd if configured. We tolerate a missing config file
     //    (init_repo always writes one in production, but some tests skip it)
     //    by treating "no config" as "no verify_cmd". Any *other* config
     //    error propagates normally.
-    let config_path = ctx.paths.config();
+    let config_path = paths.config();
     match Config::load(&config_path) {
         Ok(cfg) => {
             if let Some(cmd) = cfg.verify_cmd.as_deref() {
-                run_verify(&ctx.repo_root, cmd)?;
+                run_verify(repo_root, cmd)?;
             }
         }
         Err(dkod_worktree::Error::Io { source, .. })
@@ -76,7 +115,7 @@ pub async fn pr_with_shim(
 
     // 2. Idempotency check BEFORE pushing. Cheap fast-path when a previous
     //    run already opened the PR.
-    if let Some(url) = gh::pr_exists(&ctx.repo_root, &branch_name, path_prefix)? {
+    if let Some(url) = gh::pr_exists(repo_root, &branch_name, path_prefix)? {
         return Ok(PrResponse {
             url,
             was_existing: true,
@@ -84,28 +123,21 @@ pub async fn pr_with_shim(
     }
 
     // 3. Push the dk-branch to origin.
-    gh::push_branch(&ctx.repo_root, &branch_name, path_prefix)?;
+    gh::push_branch(repo_root, &branch_name, path_prefix)?;
 
     // 4. Re-check after push to catch the race window where another caller
     //    already created the PR. (Cheap one extra RPC; saves us from
     //    duplicate PRs which `gh pr create` would otherwise refuse with a
     //    cryptic error.)
-    if let Some(url) = gh::pr_exists(&ctx.repo_root, &branch_name, path_prefix)? {
+    if let Some(url) = gh::pr_exists(repo_root, &branch_name, path_prefix)? {
         return Ok(PrResponse {
             url,
             was_existing: true,
         });
     }
 
-    // 5. Open the PR. We intentionally do NOT clear the active session here
-    //    — `dkod_abort` / a future `dkod_close` is the deliberate end-point.
-    let url = gh::create_pr(
-        &ctx.repo_root,
-        &branch_name,
-        &req.title,
-        &req.body,
-        path_prefix,
-    )?;
+    // 5. Open the PR.
+    let url = gh::create_pr(repo_root, &branch_name, &req.title, &req.body, path_prefix)?;
     Ok(PrResponse {
         url,
         was_existing: false,

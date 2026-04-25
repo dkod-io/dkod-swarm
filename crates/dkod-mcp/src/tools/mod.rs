@@ -182,20 +182,12 @@ impl McpServer {
         &self,
         Parameters(req): Parameters<crate::schema::PrRequest>,
     ) -> std::result::Result<Json<crate::schema::PrResponse>, rmcp::ErrorData> {
-        // The whole helper is sync subprocess plumbing (`sh -c verify_cmd`,
-        // `gh pr list`, `git push`, `gh pr create`). Hand it off to a
-        // blocking thread so the tokio executor stays free — same pattern
-        // as `dkod_commit` and `dkod_plan`.
-        //
-        // We must clone the active-session id on the async path *before*
-        // entering `spawn_blocking`, because `pr_with_shim` calls
-        // `active_session.lock().await` itself and a blocking thread cannot
-        // poll a tokio mutex. The cheapest way to satisfy both constraints
-        // is to do the work directly in async (verify_cmd is the only
-        // potentially-slow step, and it usually runs <1s); the rest is a
-        // handful of millisecond-scale RPCs. If profiling later shows
-        // verify_cmd dominates, we can split this exactly like
-        // `dkod_commit` (sync inner + blocking wrapper).
+        // `pr::pr` (which delegates to `pr_with_shim` with `path_prefix:
+        // None`) handles the async/sync split itself: it captures the
+        // session id on the async path, hands the subprocess work to
+        // `tokio::task::spawn_blocking`, then re-acquires the
+        // `active_session` lock to clear it on success — matching the
+        // M2-6 `dkod_commit` pattern.
         pr::pr(&self.ctx, req).await.map(Json).map_err(Into::into)
     }
 }
