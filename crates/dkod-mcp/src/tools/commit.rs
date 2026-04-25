@@ -54,6 +54,11 @@ pub(crate) fn commit_inner(
     sid: SessionId,
 ) -> Result<CommitResponse> {
     let manifest = Manifest::load(paths, &sid)?;
+    // The before/after SHA pair assumes no other process commits on the
+    // dk-branch worktree between our two `rev-parse` calls. In M2 the
+    // single MCP-stdio caller is the only writer of this worktree; if the
+    // surface ever multiplexes, the SHA delta below would silently
+    // include foreign commits.
     let before = git_head_sha(repo_root)?;
     commit_per_group(repo_root, paths, &sid, &manifest.group_ids).map_err(Error::from)?;
     let after = git_head_sha(repo_root)?;
@@ -92,10 +97,10 @@ fn git_head_sha(repo: &Path) -> Result<String> {
         .output()
         .map_err(Error::Io)?;
     if !out.status.success() {
-        return Err(Error::InvalidArg(format!(
-            "git rev-parse HEAD failed: {}",
-            String::from_utf8_lossy(&out.stderr)
-        )));
+        return Err(Error::Git {
+            cmd: "git rev-parse HEAD".into(),
+            stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+        });
     }
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
@@ -107,10 +112,10 @@ fn git_rev_list(repo: &Path, range: &str) -> Result<Vec<String>> {
         .output()
         .map_err(Error::Io)?;
     if !out.status.success() {
-        return Err(Error::InvalidArg(format!(
-            "git rev-list {range} failed: {}",
-            String::from_utf8_lossy(&out.stderr)
-        )));
+        return Err(Error::Git {
+            cmd: format!("git rev-list {range}"),
+            stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+        });
     }
     Ok(String::from_utf8_lossy(&out.stdout)
         .lines()

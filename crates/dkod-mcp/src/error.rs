@@ -24,6 +24,9 @@ pub enum Error {
     #[error("gh subprocess failed: {cmd}: {stderr}")]
     Gh { cmd: String, stderr: String },
 
+    #[error("git subprocess failed: {cmd}: {stderr}")]
+    Git { cmd: String, stderr: String },
+
     #[error("verify_cmd failed (exit {exit}): {tail}")]
     VerifyFailed { exit: i32, tail: String },
 
