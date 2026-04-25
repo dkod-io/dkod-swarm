@@ -19,12 +19,10 @@ dkod-worktree = { path = "../dkod-worktree" }
 dkod-mcp = { path = "../dkod-mcp" }
 clap.workspace = true
 tokio.workspace = true
+rmcp.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
 
-# `rmcp` will be re-added in M3-3 when `dkod --mcp` starts using it.
-# Keeping this PR's dependency footprint to what `status`/`abort` need
-# avoids pulling rmcp + tokio-mcp into the build for no reason.
-
 [dev-dependencies]
 tempfile.workspace = true
+assert_cmd.workspace = true
