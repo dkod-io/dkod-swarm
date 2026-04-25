@@ -1,0 +1,29 @@
+[package]
+name = "dkod-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "User-facing dkod-swarm CLI: init, status, abort, and stdio MCP launcher"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "dkod"
+path = "src/main.rs"
+
+[dependencies]
+dkod-worktree = { path = "../dkod-worktree" }
+clap.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+
+# `dkod-mcp`, `rmcp`, `serde_json` will be re-added in M3-2/M3-3 when
+# `dkod status`, `dkod abort`, and `dkod --mcp` start using them. Keeping
+# this PR's dependency footprint to what `init` actually needs avoids
+# pulling rmcp + tree-sitter + tokio-mcp into the build for no reason.
+
+[dev-dependencies]
+tempfile.workspace = true

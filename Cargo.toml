@@ -4,6 +4,7 @@ members = [
     "crates/dkod-worktree",
     "crates/dkod-orchestrator",
     "crates/dkod-mcp",
+    "crates/dkod-cli",
 ]
 
 [workspace.package]
@@ -26,6 +27,8 @@ rmcp = { version = "1.5", features = ["server", "client", "macros", "transport-i
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "io-std", "process", "time"] }
 async-trait = "0.1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+clap = { version = "4", features = ["derive"] }
+assert_cmd = "2"
 
 [profile.dev]
 # keep default
