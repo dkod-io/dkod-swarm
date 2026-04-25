@@ -31,16 +31,9 @@
 
 ## Status
 
-**Design phase. No code yet. Not installable.**
+**v0 in flight — milestones 1 & 2 merged.** `cargo test --workspace` is green across 8 PRs of M1 + 8 PRs of M2.
 
-The full design lives in [`docs/design.md`](docs/design.md). Implementation starts next; star the repo to follow along as v0 lands.
-
-When v0 ships, install will look like:
-
-```
-/plugin marketplace add dkod-io/dkod-swarm
-/plugin install dkod-swarm@dkod-swarm
-```
+The full design lives in [`docs/design.md`](docs/design.md). Milestones 3+ (CLI wrapper, plugin manifest + skill, E2E smoke on a real Rust sandbox) are the remaining ship items.
 
 <br>
 
