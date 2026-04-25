@@ -26,12 +26,20 @@ pub async fn execute_complete(
         .clone()
         .ok_or(Error::NoActiveSession)?;
 
-    // `GroupSpec::load` returns `Error::Io { source: NotFound, .. }` for an
-    // unknown group id. We deliberately collapse every load failure to
-    // `UnknownGroup` here so the MCP client sees a single "this group is not
-    // part of the active session" signal instead of a leaky I/O error path.
-    let mut spec = GroupSpec::load(&ctx.paths, &sid, &req.group_id)
-        .map_err(|_| Error::UnknownGroup(req.group_id.clone()))?;
+    // Map only `NotFound` to `UnknownGroup` so the MCP client gets a clean
+    // `invalid_params` response when it sends a wrong group id. Other
+    // failures (corrupt JSON spec, id-mismatch invariant violation, real
+    // I/O errors) propagate as `Error::Worktree(_)` so the operator sees
+    // them as `internal_error` — they indicate server-side corruption,
+    // not a bad client request.
+    let mut spec = GroupSpec::load(&ctx.paths, &sid, &req.group_id).map_err(|e| match e {
+        dkod_worktree::Error::Io { source, .. }
+            if source.kind() == std::io::ErrorKind::NotFound =>
+        {
+            Error::UnknownGroup(req.group_id.clone())
+        }
+        other => Error::Worktree(other),
+    })?;
 
     spec.status = GroupStatus::Done;
     // `trim_end` keeps the appended summary readable when `agent_prompt`
