@@ -75,14 +75,22 @@ async fn abort_clears_an_active_session() {
     let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert!(parsed["session_id"].is_string());
 
-    // dk-branch must be gone.
+    // dk-branch must be gone. Verify the git invocation itself succeeded
+    // first — otherwise a non-zero exit with empty stdout would silently
+    // satisfy the assertion below and hide a real bug.
     let out = std::process::Command::new("git")
         .args(["branch", "--list", "dk/*"])
         .current_dir(&root)
         .output()
         .unwrap();
     assert!(
-        String::from_utf8(out.stdout).unwrap().trim().is_empty(),
-        "dk-branch should have been destroyed"
+        out.status.success(),
+        "git branch --list failed: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        stdout.trim().is_empty(),
+        "dk-branch should have been destroyed; got: {stdout:?}"
     );
 }
