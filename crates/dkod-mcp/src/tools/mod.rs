@@ -1,6 +1,8 @@
 pub mod abort;
 pub mod execute_begin;
+pub mod path;
 pub mod plan;
+pub mod write_symbol;
 
 use crate::ServerCtx;
 use rmcp::{
@@ -86,6 +88,25 @@ impl McpServer {
         // Same rationale as `dkod_execute_begin`: brief sync git + I/O, no
         // need for `spawn_blocking` in M2.
         abort::abort(&self.ctx).await.map(Json).map_err(Into::into)
+    }
+
+    #[tool(
+        description = "AST-level symbol replacement: holds a per-file lock, replaces the named symbol with new_body, re-parses, and appends to writes.jsonl."
+    )]
+    pub async fn dkod_write_symbol(
+        &self,
+        Parameters(req): Parameters<crate::schema::WriteSymbolRequest>,
+    ) -> std::result::Result<Json<crate::schema::WriteSymbolResponse>, rmcp::ErrorData> {
+        // No `spawn_blocking` here — see the module-level comment in
+        // `write_symbol.rs`. The helper holds a `tokio::sync::Mutex` guard
+        // across the read-modify-write, and that guard cannot cross a
+        // thread boundary cleanly. Future optimisation: hoist the
+        // `replace_symbol` parse onto a blocking thread via a held-guard
+        // channel pattern if profiling shows it matters.
+        write_symbol::write_symbol(&self.ctx, req)
+            .await
+            .map(Json)
+            .map_err(Into::into)
     }
 }
 
