@@ -16,14 +16,15 @@ path = "src/main.rs"
 
 [dependencies]
 dkod-worktree = { path = "../dkod-worktree" }
+dkod-mcp = { path = "../dkod-mcp" }
 clap.workspace = true
 tokio.workspace = true
+serde_json.workspace = true
 anyhow.workspace = true
 
-# `dkod-mcp`, `rmcp`, `serde_json` will be re-added in M3-2/M3-3 when
-# `dkod status`, `dkod abort`, and `dkod --mcp` start using them. Keeping
-# this PR's dependency footprint to what `init` actually needs avoids
-# pulling rmcp + tree-sitter + tokio-mcp into the build for no reason.
+# `rmcp` will be re-added in M3-3 when `dkod --mcp` starts using it.
+# Keeping this PR's dependency footprint to what `status`/`abort` need
+# avoids pulling rmcp + tokio-mcp into the build for no reason.
 
 [dev-dependencies]
 tempfile.workspace = true
