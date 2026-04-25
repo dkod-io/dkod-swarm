@@ -170,6 +170,27 @@ pub struct CommitResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct PrRequest {
+    /// Pull request title — passed verbatim to `gh pr create --title`.
+    pub title: String,
+    /// Pull request body (markdown) — passed verbatim to `gh pr create --body`.
+    pub body: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct PrResponse {
+    /// URL of the pull request — either the freshly-created one or, when
+    /// `was_existing == true`, an open/closed PR found by the idempotency
+    /// check that runs before pushing.
+    pub url: String,
+    /// `true` when `dkod_pr` returned the URL of a PR that already existed
+    /// before this call. This is set both by the pre-push idempotency check
+    /// (a previous run already opened the PR) and by the post-push re-check
+    /// (a concurrent process raced us to `gh pr create`).
+    pub was_existing: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct GroupStatusEntry {
     pub id: String,
     /// `"pending" | "in_progress" | "done" | "failed"` — stringified

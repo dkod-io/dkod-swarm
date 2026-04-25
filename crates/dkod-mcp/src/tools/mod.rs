@@ -4,6 +4,7 @@ pub mod execute_begin;
 pub mod execute_complete;
 pub mod path;
 pub mod plan;
+pub mod pr;
 pub mod status;
 pub mod write_symbol;
 
@@ -172,6 +173,30 @@ impl McpServer {
             })?
             .map(Json)
             .map_err(Into::into)
+    }
+
+    #[tool(
+        description = "Run verify_cmd, push dk/<sid> with --force-with-lease, and create a PR via gh. Idempotent: if a PR already exists for the dk-branch, returns its URL with was_existing=true and skips push + create."
+    )]
+    pub async fn dkod_pr(
+        &self,
+        Parameters(req): Parameters<crate::schema::PrRequest>,
+    ) -> std::result::Result<Json<crate::schema::PrResponse>, rmcp::ErrorData> {
+        // The whole helper is sync subprocess plumbing (`sh -c verify_cmd`,
+        // `gh pr list`, `git push`, `gh pr create`). Hand it off to a
+        // blocking thread so the tokio executor stays free — same pattern
+        // as `dkod_commit` and `dkod_plan`.
+        //
+        // We must clone the active-session id on the async path *before*
+        // entering `spawn_blocking`, because `pr_with_shim` calls
+        // `active_session.lock().await` itself and a blocking thread cannot
+        // poll a tokio mutex. The cheapest way to satisfy both constraints
+        // is to do the work directly in async (verify_cmd is the only
+        // potentially-slow step, and it usually runs <1s); the rest is a
+        // handful of millisecond-scale RPCs. If profiling later shows
+        // verify_cmd dominates, we can split this exactly like
+        // `dkod_commit` (sync inner + blocking wrapper).
+        pr::pr(&self.ctx, req).await.map(Json).map_err(Into::into)
     }
 }
 
