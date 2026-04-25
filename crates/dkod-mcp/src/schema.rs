@@ -152,6 +152,24 @@ pub struct StatusResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct CommitResponse {
+    /// Number of new commits produced on the dk-branch by this call —
+    /// computed as the count of revisions between HEAD-before and
+    /// HEAD-after `commit_per_group`. In the common path this equals the
+    /// number of groups whose `writes.jsonl` had at least one record
+    /// (groups with an empty log are silently skipped by
+    /// `commit_per_group`), but the value is bound to the actual git
+    /// rev-list result, not to a group-count assumption.
+    pub commits_created: usize,
+    /// `dk/<session-id>` — the branch the commits live on. Returned even when
+    /// `commits_created == 0` so callers always know which branch to push.
+    pub dk_branch: String,
+    /// Short hex SHAs of each new commit, in chronological order (group order
+    /// per `manifest.group_ids`). Empty when `commits_created == 0`.
+    pub commit_shas: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct GroupStatusEntry {
     pub id: String,
     /// `"pending" | "in_progress" | "done" | "failed"` — stringified
