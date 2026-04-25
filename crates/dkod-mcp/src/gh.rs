@@ -46,10 +46,48 @@ fn path_with_prefix(prefix: &Path) -> std::ffi::OsString {
     combined
 }
 
+/// Build a redacted `gh <args>` label for inclusion in `Error::Gh`. Values
+/// that follow user-controlled flags (`--title`, `--body`) are replaced
+/// with `<REDACTED>` so an error message that flows back to the MCP
+/// client (and possibly into logs) cannot leak the contents of an
+/// in-progress PR description. `--title=…` / `--body=…` styles are also
+/// handled. Other args (head/base branch names, JSON queries) stay
+/// verbatim — they are not user content.
+fn redact_args(args: &[&str]) -> String {
+    let mut out: Vec<String> = Vec::with_capacity(args.len());
+    let mut i = 0;
+    while i < args.len() {
+        let a = args[i];
+        if a == "--title" || a == "--body" || a == "-t" || a == "-b" {
+            out.push(a.to_owned());
+            if i + 1 < args.len() {
+                out.push("<REDACTED>".to_owned());
+                i += 2;
+                continue;
+            }
+        } else if let Some(rest) = a
+            .strip_prefix("--title=")
+            .or_else(|| a.strip_prefix("--body="))
+        {
+            let _ = rest; // value redacted
+            let prefix = if a.starts_with("--title=") {
+                "--title="
+            } else {
+                "--body="
+            };
+            out.push(format!("{prefix}<REDACTED>"));
+        } else {
+            out.push(a.to_owned());
+        }
+        i += 1;
+    }
+    out.join(" ")
+}
+
 /// Run `gh <args>` in `repo`, optionally prepending `path_prefix` to `PATH`.
 /// Returns trimmed stdout on success, [`Error::Gh`] otherwise.
 fn gh(repo: &Path, args: &[&str], path_prefix: Option<&Path>) -> Result<String> {
-    let cmd_label = format!("gh {}", args.join(" "));
+    let cmd_label = format!("gh {}", redact_args(args));
     let mut cmd = Command::new("gh");
     cmd.args(args).current_dir(repo);
     if let Some(prefix) = path_prefix {

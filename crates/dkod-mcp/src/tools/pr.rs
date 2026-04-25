@@ -64,12 +64,21 @@ pub async fn pr_with_shim(
     // `Paths` (M1 type, not `Clone`) is reconstructed inside the blocking
     // closure from `repo_root`. `ServerCtx::new` constructs it the same
     // way, so the value is identical.
+    // A `spawn_blocking` join error means the blocking task panicked or
+    // the runtime cancelled it — this is a server-side internal failure,
+    // NOT bad client input, so route it to `internal_error` via
+    // `Error::Io(io::Error::other(...))`. The `From<Error> for
+    // rmcp::ErrorData` impl in `error.rs` maps `Io` to `internal_error`.
     let resp = tokio::task::spawn_blocking(move || {
         let paths = Paths::new(&repo_root);
         pr_inner(&repo_root, &paths, sid, req, path_prefix_buf.as_deref())
     })
     .await
-    .map_err(|e| Error::InvalidArg(format!("spawn_blocking join error: {e}")))??;
+    .map_err(|e| {
+        Error::Io(std::io::Error::other(format!(
+            "spawn_blocking join error: {e}"
+        )))
+    })??;
 
     // Clear the active session on success — `ServerCtx::active_session`
     // documents that a successful `dkod_pr` ends the session lifecycle.
