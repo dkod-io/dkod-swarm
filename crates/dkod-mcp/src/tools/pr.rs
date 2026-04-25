@@ -97,13 +97,19 @@ pub(crate) fn pr_inner(
 ) -> Result<PrResponse> {
     let branch_name = branch::dk_branch_name(sid.as_str());
 
-    // 1. Run verify_cmd if configured. We tolerate a missing config file
-    //    (init_repo always writes one in production, but some tests skip it)
-    //    by treating "no config" as "no verify_cmd". Any *other* config
-    //    error propagates normally.
+    // 1. Run verify_cmd if configured AND capture `main_branch` so we can
+    //    pass it to `gh pr create --base` below — that way the PR targets
+    //    the branch `init_repo` recorded, even if GitHub's repo-level
+    //    default has since drifted (renames, fork-default mismatch, etc.).
+    //    We tolerate a missing config file (init_repo always writes one in
+    //    production, but some tests skip it) by treating "no config" as
+    //    "no verify_cmd, no base override". Any *other* config error
+    //    propagates normally.
     let config_path = paths.config();
+    let mut main_branch: Option<String> = None;
     match Config::load(&config_path) {
         Ok(cfg) => {
+            main_branch = Some(cfg.main_branch.clone());
             if let Some(cmd) = cfg.verify_cmd.as_deref() {
                 run_verify(repo_root, cmd)?;
             }
@@ -136,8 +142,17 @@ pub(crate) fn pr_inner(
         });
     }
 
-    // 5. Open the PR.
-    let url = gh::create_pr(repo_root, &branch_name, &req.title, &req.body, path_prefix)?;
+    // 5. Open the PR. `--base` is set from `Config.main_branch` so the PR
+    //    targets the branch `init_repo` recorded, not whatever GitHub
+    //    currently considers the default for the remote.
+    let url = gh::create_pr(
+        repo_root,
+        &branch_name,
+        &req.title,
+        &req.body,
+        main_branch.as_deref(),
+        path_prefix,
+    )?;
     Ok(PrResponse {
         url,
         was_existing: false,

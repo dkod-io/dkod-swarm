@@ -129,18 +129,28 @@ pub fn push_branch(repo: &Path, branch: &str, path_prefix: Option<&Path>) -> Res
 
 /// Create a PR with `gh pr create` and return its URL (the value `gh` prints
 /// to stdout on success).
+///
+/// `base` is passed to `gh` via `--base <name>` and overrides GitHub's
+/// repo-level default. Pass `None` to use whatever `gh` infers from the
+/// remote (the historical behaviour); production callers should pass
+/// `Some(&config.main_branch)` so the PR targets the same branch
+/// `init_repo` recorded — defending against the case where a repo's
+/// configured default on GitHub drifts from the local `main_branch`
+/// (renames, fork mismatch, etc.).
 pub fn create_pr(
     repo: &Path,
     branch: &str,
     title: &str,
     body: &str,
+    base: Option<&str>,
     path_prefix: Option<&Path>,
 ) -> Result<String> {
-    gh(
-        repo,
-        &[
-            "pr", "create", "--head", branch, "--title", title, "--body", body,
-        ],
-        path_prefix,
-    )
+    let mut args: Vec<&str> = vec![
+        "pr", "create", "--head", branch, "--title", title, "--body", body,
+    ];
+    if let Some(b) = base {
+        args.push("--base");
+        args.push(b);
+    }
+    gh(repo, &args, path_prefix)
 }
