@@ -11,7 +11,7 @@ use clap::{Parser, Subcommand};
 pub struct Cli {
     /// Stdio MCP-server mode. Mutually exclusive with the subcommands.
     /// We expose `--mcp` as a top-level flag (not a subcommand) so the
-    /// invocation matches design §Topology: `dkod-cli --mcp`.
+    /// invocation matches design §Topology: `dkod --mcp`.
     #[arg(long)]
     pub mcp: bool,
 
