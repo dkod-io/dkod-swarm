@@ -90,7 +90,9 @@ pub async fn write_symbol(ctx: &ServerCtx, req: WriteSymbolRequest) -> Result<Wr
 
     // Read → replace → write — all inside the guard scope. If we read
     // before the lock, a concurrent writer could overwrite our basis and
-    // our write would silently undo their change.
+    // our write would silently undo their change. We keep `bytes` (the
+    // pre-write content) in scope so the post-append undo path below can
+    // restore the file if the audit-log append fails.
     let bytes = std::fs::read(&canonical).map_err(Error::Io)?;
     let outcome = replace_symbol(&bytes, &req.qualified_name, &req.new_body)?;
     let (new_source, outcome_label, fallback_reason) = match outcome {
@@ -114,11 +116,28 @@ pub async fn write_symbol(ctx: &ServerCtx, req: WriteSymbolRequest) -> Result<Wr
     // What the per-file lock DOES serialise is the read → replace → write
     // → append sequence for the *same* source path, ensuring two writes to
     // the same file see consistent intermediate state.
-    log.append(&WriteRecord {
+    //
+    // If the append fails AFTER the file was successfully written, undo
+    // the file write so the on-disk source matches the audit trail. M2-6
+    // (`dkod_commit`) drives commits from `writes.jsonl`; a write that
+    // succeeded but never made it into the log would silently miss the
+    // commit and ship out-of-sync source on the dk-branch. Restoring the
+    // pre-write content is the only way to keep audit/source consistent
+    // without a more elaborate two-phase-commit protocol.
+    let record = WriteRecord {
         symbol: req.qualified_name,
         file_path: req.file,
         timestamp: crate::time::iso8601_now(),
-    })?;
+    };
+    if let Err(append_err) = log.append(&record) {
+        if let Err(undo_err) = std::fs::write(&canonical, &bytes) {
+            eprintln!(
+                "dkod-mcp write_symbol: post-append undo of {canonical:?} also failed: {undo_err} \
+                 (file is now in a partial-commit state — audit-log append failed: {append_err})"
+            );
+        }
+        return Err(append_err.into());
+    }
 
     Ok(WriteSymbolResponse {
         outcome: outcome_label.into(),
