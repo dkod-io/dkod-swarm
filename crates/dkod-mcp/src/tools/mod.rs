@@ -1,3 +1,5 @@
+pub mod abort;
+pub mod execute_begin;
 pub mod plan;
 
 use crate::ServerCtx;
@@ -56,6 +58,34 @@ impl McpServer {
             })?
             .map(Json)
             .map_err(Into::into)
+    }
+
+    #[tool(
+        description = "Begin execution: mint a session id, create dk/<sid> branch off main, and persist manifest + per-group specs under .dkod/sessions/."
+    )]
+    pub async fn dkod_execute_begin(
+        &self,
+        Parameters(req): Parameters<crate::schema::ExecuteBeginRequest>,
+    ) -> std::result::Result<Json<crate::schema::ExecuteBeginResponse>, rmcp::ErrorData> {
+        // `execute_begin` is light sync I/O plus a single `git checkout -b`;
+        // run it directly on the async path. The heavier tree-sitter work
+        // is what justifies `spawn_blocking` for `dkod_plan`; this tool is
+        // not in that class for M2.
+        execute_begin::execute_begin(&self.ctx, req)
+            .await
+            .map(Json)
+            .map_err(Into::into)
+    }
+
+    #[tool(
+        description = "Abort the active session: destroy dk/<sid>, mark the manifest Aborted, and clear the in-memory session + file-lock state."
+    )]
+    pub async fn dkod_abort(
+        &self,
+    ) -> std::result::Result<Json<crate::schema::AbortResponse>, rmcp::ErrorData> {
+        // Same rationale as `dkod_execute_begin`: brief sync git + I/O, no
+        // need for `spawn_blocking` in M2.
+        abort::abort(&self.ctx).await.map(Json).map_err(Into::into)
     }
 }
 

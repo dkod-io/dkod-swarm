@@ -1,5 +1,6 @@
 pub mod ctx;
 pub mod error;
+pub mod recovery;
 pub mod schema;
 pub mod time;
 pub mod tools;
