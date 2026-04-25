@@ -80,3 +80,34 @@ pub struct ExecuteBeginResponse {
 pub struct AbortResponse {
     pub session_id: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct WriteSymbolRequest {
+    /// Group whose `writes.jsonl` we append to. Must belong to the active
+    /// session.
+    pub group_id: String,
+    /// Source file containing `qualified_name`, relative to the repo root.
+    /// Resolved through the same path-escape guard `dkod_plan` uses so an
+    /// agent cannot smuggle absolute paths or `..` traversal past us.
+    pub file: PathBuf,
+    /// Symbol to replace. Same resolution rules as
+    /// `dkod_orchestrator::replace::replace_symbol`: exact qualified-name
+    /// first, then a unique short-name match.
+    pub qualified_name: String,
+    /// Replacement source for the symbol's span (just the symbol body,
+    /// not the surrounding file).
+    pub new_body: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct WriteSymbolResponse {
+    /// `"parsed_ok"` when the post-replace re-parse confirmed the symbol is
+    /// still present, `"fallback"` otherwise (caller should treat as a soft
+    /// warning per design §edge case #5).
+    pub outcome: String,
+    /// Populated when `outcome == "fallback"`. Mirrors
+    /// `ReplaceOutcome::Fallback::reason`.
+    pub fallback_reason: Option<String>,
+    /// Number of bytes written to disk (i.e. the new file length).
+    pub bytes_written: usize,
+}

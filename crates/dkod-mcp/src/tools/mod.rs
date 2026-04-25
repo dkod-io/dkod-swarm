@@ -1,5 +1,6 @@
 pub mod abort;
 pub mod execute_begin;
+pub mod path;
 pub mod plan;
 
 use crate::ServerCtx;
