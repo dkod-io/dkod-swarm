@@ -88,7 +88,7 @@ Poller discipline per `~/.claude/memory/tools/coderabbit.md`: arm the 3-conditio
 
 # PR M3-1 — Scaffold + `dkod init`
 
-### Task 1: Workspace + crate manifest
+## Task 1: Workspace + crate manifest
 
 **Files:**
 - Modify: `Cargo.toml` (workspace root) — add `clap`, `assert_cmd` to `[workspace.dependencies]`; add `crates/dkod-cli` to `members`
@@ -163,7 +163,7 @@ git commit -m "Add dkod-cli crate skeleton + workspace deps"
 
 Verify identity + clean Co-Authored-By per `CLAUDE.md`.
 
-### Task 2: clap `Cli` parser
+## Task 2: clap `Cli` parser
 
 **Files:**
 - Create: `crates/dkod-cli/src/lib.rs`
@@ -370,7 +370,7 @@ git commit -m "Add dkod CLI parser with stub dispatch"
 
 Run `/coderabbit:code-review` first.
 
-### Task 3: `dkod init` implementation
+## Task 3: `dkod init` implementation
 
 **Files:**
 - Create: `crates/dkod-cli/src/cmd/init.rs`
@@ -485,9 +485,9 @@ GIT_COMMITTER_NAME="Haim Ari" GIT_COMMITTER_EMAIL="haimari1@gmail.com" \
 git commit -m "Add dkod init subcommand wrapping init_repo"
 ```
 
-### Task 4: PR M3-1 wrap-up
+## Task 4: PR M3-1 wrap-up
 
-- [ ] `/coderabbit:code-review` clean; `cargo test --workspace` green (M2 left it at 36; M3-1 adds `cli_parse` (5 tests) and `init_cmd` (2 tests) — count should be ≥ 38).
+- [ ] `/coderabbit:code-review` clean; `cargo test --workspace` green (the new `cli_parse` and `init_cmd` test files both pass; the rest of the workspace stays green).
 - [ ] Push, open PR `M3-1: dkod-cli scaffold + dkod init`. Body = summary + test-plan checklist.
 - [ ] Arm the CodeRabbit poller. Iterate `/coderabbit:autofix` until clean.
 - [ ] Merge autonomously.
@@ -496,7 +496,7 @@ git commit -m "Add dkod init subcommand wrapping init_repo"
 
 # PR M3-2 — `dkod status` + `dkod abort`
 
-### Task 5: `dkod status` implementation
+## Task 5: `dkod status` implementation
 
 **Files:**
 - Create: `crates/dkod-cli/src/cmd/status.rs`
@@ -590,7 +590,7 @@ GIT_COMMITTER_NAME="Haim Ari" GIT_COMMITTER_EMAIL="haimari1@gmail.com" \
 git commit -m "Add dkod status subcommand"
 ```
 
-### Task 6: `dkod abort` implementation
+## Task 6: `dkod abort` implementation
 
 **Files:**
 - Create: `crates/dkod-cli/src/cmd/abort.rs`
@@ -749,16 +749,16 @@ GIT_COMMITTER_NAME="Haim Ari" GIT_COMMITTER_EMAIL="haimari1@gmail.com" \
 git commit -m "Add dkod abort subcommand"
 ```
 
-### Task 7: PR M3-2 wrap-up
+## Task 7: PR M3-2 wrap-up
 
-- [ ] `/coderabbit:code-review` clean; `cargo test --workspace` green (≥ 39 with `status_cmd` (1 test) + `abort_cmd` (2 tests)).
+- [ ] `/coderabbit:code-review` clean; `cargo test --workspace` green (the new `status_cmd` and `abort_cmd` test files both pass).
 - [ ] PR `M3-2: dkod status + dkod abort`. Merge autonomously.
 
 ---
 
 # PR M3-3 — `dkod --mcp` + subprocess E2E
 
-### Task 8: `dkod --mcp` dispatch
+## Task 8: `dkod --mcp` dispatch
 
 **Files:**
 - Create: `crates/dkod-cli/src/cmd/mcp.rs`
@@ -834,7 +834,7 @@ GIT_COMMITTER_NAME="Haim Ari" GIT_COMMITTER_EMAIL="haimari1@gmail.com" \
 git commit -m "Add dkod --mcp stdio dispatch"
 ```
 
-### Task 9: Subprocess E2E test
+## Task 9: Subprocess E2E test
 
 **Files:**
 - Create: `crates/dkod-cli/tests/e2e_subprocess.rs`
@@ -933,7 +933,7 @@ GIT_COMMITTER_NAME="Haim Ari" GIT_COMMITTER_EMAIL="haimari1@gmail.com" \
 git commit -m "Add dkod CLI subprocess E2E test"
 ```
 
-### Task 10: README update
+## Task 10: README update
 
 **Files:**
 - Modify: `README.md`
@@ -980,9 +980,9 @@ GIT_COMMITTER_NAME="Haim Ari" GIT_COMMITTER_EMAIL="haimari1@gmail.com" \
 git commit -m "Document dkod CLI usage in README"
 ```
 
-### Task 11: PR M3-3 wrap-up
+## Task 11: PR M3-3 wrap-up
 
-- [ ] `cargo test --workspace` green (≥ 42 with the 3 e2e_subprocess tests).
+- [ ] `cargo test --workspace` green (the new `e2e_subprocess` tests pass; the workspace stays green).
 - [ ] PR `M3-3: dkod --mcp + subprocess E2E`. Merge autonomously.
 - [ ] Tag `v0.3.0-m3` on `main` (controller's job after merge):
 
