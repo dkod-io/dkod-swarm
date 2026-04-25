@@ -16,16 +16,14 @@ path = "src/main.rs"
 
 [dependencies]
 dkod-worktree = { path = "../dkod-worktree" }
-dkod-orchestrator = { path = "../dkod-orchestrator" }
-dkod-mcp = { path = "../dkod-mcp" }
 clap.workspace = true
 tokio.workspace = true
-rmcp.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-thiserror.workspace = true
 anyhow.workspace = true
+
+# `dkod-mcp`, `rmcp`, `serde_json` will be re-added in M3-2/M3-3 when
+# `dkod status`, `dkod abort`, and `dkod --mcp` start using them. Keeping
+# this PR's dependency footprint to what `init` actually needs avoids
+# pulling rmcp + tree-sitter + tokio-mcp into the build for no reason.
 
 [dev-dependencies]
 tempfile.workspace = true
-assert_cmd.workspace = true

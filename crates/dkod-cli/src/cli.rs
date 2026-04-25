@@ -12,13 +12,16 @@ pub struct Cli {
     /// Stdio MCP-server mode. Mutually exclusive with the subcommands.
     /// We expose `--mcp` as a top-level flag (not a subcommand) so the
     /// invocation matches design §Topology: `dkod-cli --mcp`.
-    #[arg(long, global = false)]
+    #[arg(long)]
     pub mcp: bool,
 
     #[command(subcommand)]
     pub subcommand: Option<RawCommand>,
 }
 
+/// Subcommand as parsed from argv, before reconciling with the
+/// top-level `--mcp` flag. Use [`Cli::command_resolved`] to collapse
+/// this and the flag into the [`Command`] enum the dispatch matches on.
 #[derive(Debug, Subcommand)]
 pub enum RawCommand {
     /// Initialise `.dkod/` in the current directory.
@@ -37,9 +40,13 @@ pub enum RawCommand {
 /// subcommand: exactly one of the variants below is selected.
 #[derive(Debug)]
 pub enum Command {
+    /// `dkod init` — wrap `dkod_worktree::init_repo`.
     Init { verify_cmd: Option<String> },
+    /// `dkod status` — JSON snapshot of the session.
     Status,
+    /// `dkod abort` — destroy the active dk-branch.
     Abort,
+    /// `dkod --mcp` — stdio MCP server.
     Mcp,
 }
 
