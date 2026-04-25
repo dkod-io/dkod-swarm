@@ -1,0 +1,31 @@
+[package]
+name = "dkod-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "User-facing dkod-swarm CLI: init, status, abort, and stdio MCP launcher"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "dkod"
+path = "src/main.rs"
+
+[dependencies]
+dkod-worktree = { path = "../dkod-worktree" }
+dkod-orchestrator = { path = "../dkod-orchestrator" }
+dkod-mcp = { path = "../dkod-mcp" }
+clap.workspace = true
+tokio.workspace = true
+rmcp.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+assert_cmd.workspace = true
