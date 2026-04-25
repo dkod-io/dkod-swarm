@@ -75,13 +75,20 @@ pub async fn write_symbol(ctx: &ServerCtx, req: WriteSymbolRequest) -> Result<Wr
     let bytes_written = new_source.len();
     std::fs::write(&canonical, &new_source).map_err(Error::Io)?;
 
-    // Append to `writes.jsonl`. `WriteLog::append` opens with O_APPEND, but
-    // we do not lean on POSIX append atomicity — concurrent appenders to
-    // the same group log are already serialised by the per-file lock above
-    // (they are writing the same file, so they share a lock entry only if
-    // they target the same source path; for distinct source paths within
-    // the same group, the JSONL append happens to be safe under O_APPEND
-    // for line-sized writes on Linux/macOS, which is what we rely on here).
+    // Append to the group's `writes.jsonl`.
+    //
+    // The per-file lock above is keyed by **source path** (e.g. `src/lib.rs`),
+    // not by the JSONL log path — so it does NOT serialise concurrent
+    // appenders to the same group log when those appenders are writing
+    // *different* source files. Concurrent JSONL append safety relies on
+    // `WriteLog::append` opening with `O_APPEND`, which on Linux/macOS gives
+    // atomic line-sized writes (POSIX `write(2)` PIPE_BUF guarantee for
+    // local files). The records produced here are well under that bound,
+    // so this is the correct guarantee to lean on.
+    //
+    // What the per-file lock DOES serialise is the read → replace → write
+    // → append sequence for the *same* source path, ensuring two writes to
+    // the same file see consistent intermediate state.
     let log = WriteLog::open(&ctx.paths, &sid, &req.group_id)?;
     log.append(&WriteRecord {
         symbol: req.qualified_name,
