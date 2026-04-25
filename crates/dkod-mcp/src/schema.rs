@@ -94,8 +94,12 @@ pub struct WriteSymbolRequest {
     /// `dkod_orchestrator::replace::replace_symbol`: exact qualified-name
     /// first, then a unique short-name match.
     pub qualified_name: String,
-    /// Replacement source for the symbol's span (just the symbol body,
-    /// not the surrounding file).
+    /// Replacement source for the symbol's **entire span** — not just the
+    /// inner block. `dkod_orchestrator::replace::replace_symbol` performs a
+    /// full-span splice from the symbol's start byte to its end byte, so
+    /// this string must be a complete replacement item. For a function
+    /// rewrite, supply the full `pub fn name(...) -> T { ... }`, including
+    /// signature, attributes, and braces — not just the body inside `{}`.
     pub new_body: String,
 }
 

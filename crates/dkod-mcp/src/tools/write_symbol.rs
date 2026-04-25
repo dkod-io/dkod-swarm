@@ -63,6 +63,31 @@ pub async fn write_symbol(ctx: &ServerCtx, req: WriteSymbolRequest) -> Result<Wr
     let lock = ctx.file_lock(&canonical).await;
     let _guard = lock.lock().await;
 
+    // Re-check the active session under the per-file lock. There is a
+    // narrow window between the initial `sid` snapshot above and the
+    // acquisition of `_guard` during which `dkod_abort` can complete
+    // (it acquires `active_session` + the lock-table outer mutex
+    // atomically, destroys the dk-branch, and clears both). Without this
+    // re-check, a write that was in-flight when abort fired would land
+    // on the post-abort working tree (`main`), corrupting the wrong
+    // branch. A complete fix would have `dkod_abort` drain every
+    // per-file lock before destroying the branch — that is filed for a
+    // follow-up PR; the re-check here closes the realistic window for
+    // the current single-stdio-client threat model.
+    {
+        let active_now = ctx.active_session.lock().await;
+        match active_now.as_ref() {
+            Some(s) if s.as_str() == sid.as_str() => {}
+            _ => return Err(Error::NoActiveSession),
+        }
+    }
+
+    // Open the WriteLog BEFORE mutating the file. `WriteLog::open`
+    // creates the group's `writes.jsonl` parent directory and validates
+    // that `req.group_id` is a safe path component — failing here
+    // ensures we never mutate the source file with a bad group id.
+    let log = WriteLog::open(&ctx.paths, &sid, &req.group_id)?;
+
     // Read → replace → write — all inside the guard scope. If we read
     // before the lock, a concurrent writer could overwrite our basis and
     // our write would silently undo their change.
@@ -89,7 +114,6 @@ pub async fn write_symbol(ctx: &ServerCtx, req: WriteSymbolRequest) -> Result<Wr
     // What the per-file lock DOES serialise is the read → replace → write
     // → append sequence for the *same* source path, ensuring two writes to
     // the same file see consistent intermediate state.
-    let log = WriteLog::open(&ctx.paths, &sid, &req.group_id)?;
     log.append(&WriteRecord {
         symbol: req.qualified_name,
         file_path: req.file,
