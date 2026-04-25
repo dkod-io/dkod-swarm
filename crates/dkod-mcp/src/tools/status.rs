@@ -54,10 +54,24 @@ pub async fn status(ctx: &ServerCtx) -> Result<StatusResponse> {
             }
             Err(e) => return Err(Error::from(e)),
         };
-        let writes = WriteLog::open(&ctx.paths, &sid, gid)
-            .and_then(|l| l.read_all())
-            .map(|v| v.len())
-            .unwrap_or(0);
+        // Read-only contract: `WriteLog::open` calls `create_dir_all` on the
+        // group dir as a convenience for the writer path, which would mutate
+        // disk if we naively called it from `dkod_status`. Check the group
+        // dir up-front and only open the log if it already exists; for a
+        // group with no writes the response is 0.
+        let group_dir_exists = ctx
+            .paths
+            .group(sid.as_str(), gid)
+            .map(|p| p.exists())
+            .unwrap_or(false);
+        let writes = if group_dir_exists {
+            WriteLog::open(&ctx.paths, &sid, gid)
+                .and_then(|l| l.read_all())
+                .map(|v| v.len())
+                .unwrap_or(0)
+        } else {
+            0
+        };
         let status = match spec.status {
             GroupStatus::Pending => "pending",
             GroupStatus::InProgress => "in_progress",
