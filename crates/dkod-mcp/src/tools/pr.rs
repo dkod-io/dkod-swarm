@@ -154,18 +154,37 @@ pub(crate) fn pr_inner(
     // 5. Open the PR. `--base` is set from `Config.main_branch` so the PR
     //    targets the branch `init_repo` recorded, not whatever GitHub
     //    currently considers the default for the remote.
-    let url = gh::create_pr(
+    //
+    // TOCTOU recovery: if a concurrent caller raced us between the
+    // post-push check above and this create call, `gh pr create` will
+    // exit non-zero with "a PR already exists for this branch". We
+    // re-query `pr_exists` once before returning the create error — if a
+    // PR is now visible we return it as `was_existing: true`, otherwise
+    // we propagate the original create failure (so genuinely-broken
+    // creates still surface as `Error::Gh` to the caller).
+    match gh::create_pr(
         repo_root,
         &branch_name,
         &req.title,
         &req.body,
         main_branch.as_deref(),
         path_prefix,
-    )?;
-    Ok(PrResponse {
-        url,
-        was_existing: false,
-    })
+    ) {
+        Ok(url) => Ok(PrResponse {
+            url,
+            was_existing: false,
+        }),
+        Err(create_err) => {
+            if let Some(url) = gh::pr_exists(repo_root, &branch_name, path_prefix)? {
+                Ok(PrResponse {
+                    url,
+                    was_existing: true,
+                })
+            } else {
+                Err(create_err)
+            }
+        }
+    }
 }
 
 /// Run `verify_cmd` via `sh -c <cmd>` in the repo root. On a non-zero exit,
