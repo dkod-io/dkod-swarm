@@ -65,6 +65,16 @@ async fn call_tool_json(
 /// Drop-guard that restores the previous `PATH` value when this test exits.
 /// `set_var` is `unsafe` from edition 2024 onward (it mutates global process
 /// state); the guard makes the unsafe block tightly scoped to setup/teardown.
+///
+/// **Concurrency invariant.** `PathGuard` is process-global. The `e2e_smoke`
+/// test binary intentionally contains exactly ONE `#[tokio::test]`
+/// (`full_plan_to_pr_flow`) — Rust tests in the same binary can run in
+/// parallel by default, so installing this guard concurrently from a sibling
+/// test would race. If you ever add a second test to this file, either
+/// (a) move it to its own `tests/*.rs` file (each test binary has its own
+/// process), (b) add the `serial_test` crate and annotate both with
+/// `#[serial]`, or (c) document the constraint and run with
+/// `RUST_TEST_THREADS=1` in CI. None of those is needed today.
 struct PathGuard {
     saved: Option<std::ffi::OsString>,
 }
