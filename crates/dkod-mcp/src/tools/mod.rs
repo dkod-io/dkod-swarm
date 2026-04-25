@@ -4,6 +4,7 @@ pub mod execute_begin;
 pub mod execute_complete;
 pub mod path;
 pub mod plan;
+pub mod pr;
 pub mod status;
 pub mod write_symbol;
 
@@ -172,6 +173,22 @@ impl McpServer {
             })?
             .map(Json)
             .map_err(Into::into)
+    }
+
+    #[tool(
+        description = "Run verify_cmd, push dk/<sid> with --force-with-lease, and create a PR via gh. Idempotent: if a PR already exists for the dk-branch, returns its URL with was_existing=true and skips push + create."
+    )]
+    pub async fn dkod_pr(
+        &self,
+        Parameters(req): Parameters<crate::schema::PrRequest>,
+    ) -> std::result::Result<Json<crate::schema::PrResponse>, rmcp::ErrorData> {
+        // `pr::pr` (which delegates to `pr_with_shim` with `path_prefix:
+        // None`) handles the async/sync split itself: it captures the
+        // session id on the async path, hands the subprocess work to
+        // `tokio::task::spawn_blocking`, then re-acquires the
+        // `active_session` lock to clear it on success — matching the
+        // M2-6 `dkod_commit` pattern.
+        pr::pr(&self.ctx, req).await.map(Json).map_err(Into::into)
     }
 }
 
