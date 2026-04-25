@@ -105,10 +105,18 @@ fn dkod_rejects_mcp_with_subcommand() {
     // subcommand are not declared mutually exclusive at the clap
     // layer); `Cli::command_resolved` is what enforces the rule and
     // surfaces an Err. The binary's `main` propagates that Err and
-    // exits non-zero — that is what we assert here.
-    Command::cargo_bin("dkod")
+    // exits non-zero — that is what we assert here. The stderr check
+    // pins the failure to the resolver path: a `.failure()`-only
+    // assertion would also pass if clap rejected the args earlier for
+    // some unrelated reason.
+    let assert = Command::cargo_bin("dkod")
         .expect("cargo_bin dkod")
         .args(["--mcp", "init"])
         .assert()
         .failure();
+    let stderr = String::from_utf8_lossy(&assert.get_output().stderr).to_string();
+    assert!(
+        stderr.contains("--mcp cannot be combined"),
+        "stderr should report the resolver error, got: {stderr}"
+    );
 }
