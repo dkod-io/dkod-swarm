@@ -115,3 +115,54 @@ pub struct WriteSymbolResponse {
     /// Number of bytes written to disk (i.e. the new file length).
     pub bytes_written: usize,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct ExecuteCompleteRequest {
+    /// Group whose status should transition to `done`. Must belong to the
+    /// active session.
+    pub group_id: String,
+    /// Free-form summary written by the calling agent. Persisted by appending
+    /// ` — summary: <summary>` to the group's `agent_prompt` (GroupSpec has
+    /// no dedicated summary field in M2; if a future PR adds one in
+    /// `dkod-worktree`, this wrapper switches to that field).
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct ExecuteCompleteResponse {
+    pub group_id: String,
+    /// Always `"done"` in M2 — `"failed"` is reserved for a future variant
+    /// that records a non-recoverable agent error.
+    pub new_status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct StatusResponse {
+    /// `Some(sid)` when an `Executing` session is active in this process,
+    /// `None` otherwise. `None` is not an error — callers use it to decide
+    /// whether to issue `dkod_execute_begin` first.
+    pub active_session_id: Option<String>,
+    /// `Some("dk/<sid>")` mirroring `dkod_execute_begin`'s response, `None`
+    /// when no session is active.
+    pub dk_branch: Option<String>,
+    /// One entry per group id on the manifest. Groups whose spec fails to
+    /// load are silently skipped (they cannot meaningfully contribute a
+    /// status row).
+    pub groups: Vec<GroupStatusEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct GroupStatusEntry {
+    pub id: String,
+    /// `"pending" | "in_progress" | "done" | "failed"` — stringified
+    /// `dkod_worktree::GroupStatus` so MCP clients without the worktree
+    /// schema can read it.
+    pub status: String,
+    /// Number of records appended to the group's `writes.jsonl`. A missing
+    /// log file is treated as `0` (matching `WriteLog::read_all`).
+    pub writes: usize,
+    /// Currently echoes `agent_prompt` (which `dkod_execute_complete`
+    /// appends a summary to). Optional only because future schema changes
+    /// might decouple summary from prompt — for now it is always `Some`.
+    pub agent_summary: Option<String>,
+}

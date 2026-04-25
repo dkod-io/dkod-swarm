@@ -1,7 +1,9 @@
 pub mod abort;
 pub mod execute_begin;
+pub mod execute_complete;
 pub mod path;
 pub mod plan;
+pub mod status;
 pub mod write_symbol;
 
 use crate::ServerCtx;
@@ -104,6 +106,37 @@ impl McpServer {
         // `replace_symbol` parse onto a blocking thread via a held-guard
         // channel pattern if profiling shows it matters.
         write_symbol::write_symbol(&self.ctx, req)
+            .await
+            .map(Json)
+            .map_err(Into::into)
+    }
+
+    #[tool(description = "Mark a group done; records the agent's summary on the group spec.")]
+    pub async fn dkod_execute_complete(
+        &self,
+        Parameters(req): Parameters<crate::schema::ExecuteCompleteRequest>,
+    ) -> std::result::Result<Json<crate::schema::ExecuteCompleteResponse>, rmcp::ErrorData> {
+        // No `spawn_blocking`: the helper performs only a brief mutex
+        // acquire plus a single small JSON read + atomic write of the
+        // group spec. Same rationale as `dkod_execute_begin` /
+        // `dkod_abort` above.
+        execute_complete::execute_complete(&self.ctx, req)
+            .await
+            .map(Json)
+            .map_err(Into::into)
+    }
+
+    #[tool(
+        description = "Return the active session id, dk-branch, and per-group status + write count. No-op-safe when no session is active."
+    )]
+    pub async fn dkod_status(
+        &self,
+    ) -> std::result::Result<Json<crate::schema::StatusResponse>, rmcp::ErrorData> {
+        // Read-only: no `spawn_blocking`, no per-file lock. Cost is one
+        // mutex acquire plus N small JSON reads (one manifest + one spec
+        // and one writes log per group); negligible vs. the executor cost
+        // of switching to a blocking thread.
+        status::status(&self.ctx)
             .await
             .map(Json)
             .map_err(Into::into)
