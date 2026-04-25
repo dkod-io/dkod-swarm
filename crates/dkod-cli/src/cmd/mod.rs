@@ -7,5 +7,6 @@
 //! handles both shapes by `await`ing async fns and calling sync fns
 //! directly.
 
+pub mod abort;
 pub mod init;
 pub mod status;
