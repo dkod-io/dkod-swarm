@@ -1,5 +1,6 @@
 pub mod abort;
 pub mod execute_begin;
+pub mod execute_complete;
 pub mod path;
 pub mod plan;
 pub mod write_symbol;
@@ -104,6 +105,21 @@ impl McpServer {
         // `replace_symbol` parse onto a blocking thread via a held-guard
         // channel pattern if profiling shows it matters.
         write_symbol::write_symbol(&self.ctx, req)
+            .await
+            .map(Json)
+            .map_err(Into::into)
+    }
+
+    #[tool(description = "Mark a group done; records the agent's summary on the group spec.")]
+    pub async fn dkod_execute_complete(
+        &self,
+        Parameters(req): Parameters<crate::schema::ExecuteCompleteRequest>,
+    ) -> std::result::Result<Json<crate::schema::ExecuteCompleteResponse>, rmcp::ErrorData> {
+        // No `spawn_blocking`: the helper performs only a brief mutex
+        // acquire plus a single small JSON read + atomic write of the
+        // group spec. Same rationale as `dkod_execute_begin` /
+        // `dkod_abort` above.
+        execute_complete::execute_complete(&self.ctx, req)
             .await
             .map(Json)
             .map_err(Into::into)
