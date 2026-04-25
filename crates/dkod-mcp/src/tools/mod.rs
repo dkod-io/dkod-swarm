@@ -1,4 +1,5 @@
 pub mod abort;
+pub mod commit;
 pub mod execute_begin;
 pub mod execute_complete;
 pub mod path;
@@ -138,6 +139,37 @@ impl McpServer {
         // of switching to a blocking thread.
         status::status(&self.ctx)
             .await
+            .map(Json)
+            .map_err(Into::into)
+    }
+
+    #[tool(
+        description = "Finalize the active session by writing one commit per group (with writes) on the dk-branch. Identity is forced to Haim Ari <haimari1@gmail.com>. Marks the manifest Committed."
+    )]
+    pub async fn dkod_commit(
+        &self,
+    ) -> std::result::Result<Json<crate::schema::CommitResponse>, rmcp::ErrorData> {
+        // The session-id read is async (tokio Mutex), but every subsequent
+        // step shells out to git: `rev-parse`, `rev-list`, plus the
+        // per-group `git add` + `git commit` chain that `commit_per_group`
+        // runs internally. Hand the sid off to `commit_inner` on a blocking
+        // thread so the tokio executor can keep driving other tool calls
+        // while git runs. Pattern: same split as `dkod_plan`'s sync helper +
+        // `spawn_blocking` wrapper.
+        let sid = self
+            .ctx
+            .active_session
+            .lock()
+            .await
+            .clone()
+            .ok_or(crate::Error::NoActiveSession)
+            .map_err(rmcp::ErrorData::from)?;
+        let ctx = self.ctx.clone();
+        tokio::task::spawn_blocking(move || commit::commit_inner(&ctx.repo_root, &ctx.paths, sid))
+            .await
+            .map_err(|e| {
+                rmcp::ErrorData::internal_error(format!("spawn_blocking join error: {e}"), None)
+            })?
             .map(Json)
             .map_err(Into::into)
     }
