@@ -31,9 +31,25 @@
 
 ## Status
 
-**v0 in flight — milestones 1 & 2 merged.** `cargo test --workspace` is green across 8 PRs of M1 + 8 PRs of M2.
+**v0 in flight — milestones 1, 2, and 3 merged.** `cargo test --workspace` is green across 8 PRs of M1, 8 PRs of M2, and 3 PRs of M3.
 
-The full design lives in [`docs/design.md`](docs/design.md). Milestones 3+ (CLI wrapper, plugin manifest + skill, E2E smoke on a real Rust sandbox) are the remaining ship items.
+The full design lives in [`docs/design.md`](docs/design.md). Milestones 4+ (plugin manifest + skill, real-Rust-sandbox smoke test, marketplace publish) are the remaining ship items.
+
+<br>
+
+## Try it
+
+```sh
+# In any git repo:
+cargo run -p dkod-cli --bin dkod -- init
+cargo run -p dkod-cli --bin dkod -- status
+cargo run -p dkod-cli --bin dkod -- abort   # only if a session is active
+cargo run -p dkod-cli --bin dkod -- --mcp   # stdio MCP server (Claude Code expected)
+```
+
+`dkod init` writes `.dkod/config.toml`. `dkod status` prints a JSON snapshot of the
+current session. `dkod abort` destroys an active dk-branch. `dkod --mcp` is the
+stdio entry the Claude Code plugin will use once M4's plugin manifest lands.
 
 <br>
 

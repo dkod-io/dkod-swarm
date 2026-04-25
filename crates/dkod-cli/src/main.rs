@@ -28,6 +28,9 @@ async fn run() -> anyhow::Result<()> {
             dkod_cli::cmd::abort::run(&cwd).await?;
             Ok(())
         }
-        Command::Mcp => anyhow::bail!("`dkod --mcp` not yet implemented (PR M3-3)"),
+        Command::Mcp => {
+            let cwd = std::env::current_dir()?;
+            dkod_cli::cmd::mcp::run(&cwd).await
+        }
     }
 }
