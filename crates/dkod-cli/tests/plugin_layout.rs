@@ -89,3 +89,50 @@ fn skill_md_has_frontmatter_and_name_field() {
         "SKILL.md frontmatter must include a description"
     );
 }
+
+fn assert_md_frontmatter_has(path: &std::path::Path, required_keys: &[&str]) {
+    let text = std::fs::read_to_string(path)
+        .unwrap_or_else(|e| panic!("read {} failed: {e}", path.display()));
+    assert!(
+        text.starts_with("---\n"),
+        "{} must start with `---` frontmatter delimiter",
+        path.display()
+    );
+    let after_open = &text[4..];
+    let close_idx = after_open
+        .find("\n---")
+        .unwrap_or_else(|| panic!("{} has no closing `---`", path.display()));
+    let frontmatter = &after_open[..close_idx];
+    for key in required_keys {
+        // Match against the start of a frontmatter line (after any leading
+        // indentation) so a key buried inside a value or comment cannot
+        // false-positive. `key` is expected to look like `name:` or
+        // `name: parallel-executor` — both shapes work because the check
+        // is "line starts with key".
+        let has_key = frontmatter
+            .lines()
+            .any(|line| line.trim_start().starts_with(key));
+        assert!(
+            has_key,
+            "{} frontmatter missing `{key}` as a line; got:\n{frontmatter}",
+            path.display()
+        );
+    }
+}
+
+#[test]
+fn slash_command_files_have_description_frontmatter() {
+    let dir = workspace_root().join("plugin/commands");
+    for name in ["plan.md", "execute.md", "pr.md"] {
+        assert_md_frontmatter_has(&dir.join(name), &["description:"]);
+    }
+}
+
+#[test]
+fn parallel_executor_agent_has_required_frontmatter() {
+    let path = workspace_root().join("plugin/agents/parallel-executor.md");
+    assert_md_frontmatter_has(
+        &path,
+        &["name: parallel-executor", "description:", "model:"],
+    );
+}
