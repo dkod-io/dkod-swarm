@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "dkod-swarm": {
+      "command": "cargo",
+      "args": [
+        "run",
+        "--quiet",
+        "--manifest-path",
+        "${CLAUDE_PLUGIN_ROOT}/../Cargo.toml",
+        "-p",
+        "dkod-cli",
+        "--bin",
+        "dkod",
+        "--",
+        "--mcp"
+      ]
+    }
+  }
+}
