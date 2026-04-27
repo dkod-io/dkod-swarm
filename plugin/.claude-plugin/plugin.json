@@ -1,0 +1,23 @@
+{
+  "name": "dkod-swarm",
+  "version": "0.4.0",
+  "description": "Local-first parallel AI coding agents. N Task subagents rewrite different functions in the same file simultaneously; AST-level merge happens in-place via the dkod-mcp server. One worktree, one dk-branch, one PR. Zero network coordination.",
+  "author": {
+    "name": "Haim Ari",
+    "email": "haimari1@gmail.com"
+  },
+  "homepage": "https://github.com/dkod-io/dkod-swarm",
+  "repository": "https://github.com/dkod-io/dkod-swarm",
+  "license": "MIT",
+  "keywords": [
+    "parallel",
+    "multi-agent",
+    "ast",
+    "symbol-merge",
+    "rust",
+    "tree-sitter",
+    "mcp",
+    "local-first",
+    "claude-code"
+  ]
+}
