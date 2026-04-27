@@ -65,3 +65,27 @@ fn mcp_config_is_valid_json_and_declares_dkod_swarm_server() {
         "dkod-swarm args must pass `--mcp` so dkod-cli enters stdio MCP mode"
     );
 }
+
+#[test]
+fn skill_md_has_frontmatter_and_name_field() {
+    let path = workspace_root().join("plugin/skills/dkod-swarm/SKILL.md");
+    let text = std::fs::read_to_string(&path).expect("read SKILL.md");
+    assert!(
+        text.starts_with("---\n"),
+        "SKILL.md must start with a YAML frontmatter delimiter `---`"
+    );
+    // Find the closing `---` and pull the frontmatter slice.
+    let after_open = &text[4..];
+    let close_idx = after_open
+        .find("\n---")
+        .expect("SKILL.md frontmatter has no closing delimiter");
+    let frontmatter = &after_open[..close_idx];
+    assert!(
+        frontmatter.contains("name: dkod-swarm"),
+        "SKILL.md frontmatter must declare `name: dkod-swarm`; got:\n{frontmatter}"
+    );
+    assert!(
+        frontmatter.contains("description:"),
+        "SKILL.md frontmatter must include a description"
+    );
+}
