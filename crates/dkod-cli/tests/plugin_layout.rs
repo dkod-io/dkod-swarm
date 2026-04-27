@@ -104,9 +104,17 @@ fn assert_md_frontmatter_has(path: &std::path::Path, required_keys: &[&str]) {
         .unwrap_or_else(|| panic!("{} has no closing `---`", path.display()));
     let frontmatter = &after_open[..close_idx];
     for key in required_keys {
+        // Match against the start of a frontmatter line (after any leading
+        // indentation) so a key buried inside a value or comment cannot
+        // false-positive. `key` is expected to look like `name:` or
+        // `name: parallel-executor` — both shapes work because the check
+        // is "line starts with key".
+        let has_key = frontmatter
+            .lines()
+            .any(|line| line.trim_start().starts_with(key));
         assert!(
-            frontmatter.contains(key),
-            "{} frontmatter missing `{key}`; got:\n{frontmatter}",
+            has_key,
+            "{} frontmatter missing `{key}` as a line; got:\n{frontmatter}",
             path.display()
         );
     }
