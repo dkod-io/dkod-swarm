@@ -182,9 +182,9 @@ This file tells Claude Code how to spawn the MCP server. For M4 (pre-marketplace
 
 `${CLAUDE_PLUGIN_ROOT}` is set by Claude Code to the plugin directory (`plugin/`). The workspace `Cargo.toml` lives one level up. M6 (marketplace publish) replaces this with a binary-distribution model.
 
-- [ ] **Step 3: Create `plugin/README.md`.**
+- [ ] **Step 3: Create `plugin/README.md`.** (Outer fence is four backticks because the body contains a triple-backtick shell block.)
 
-```markdown
+````markdown
 # dkod-swarm — Claude Code plugin
 
 The Claude Code-side of [dkod-swarm](https://github.com/dkod-io/dkod-swarm) — a skill, three slash commands, and a parallel-executor subagent that orchestrate the 8-tool MCP server shipped in `crates/dkod-mcp`.
@@ -222,7 +222,7 @@ The `.mcp.json` runs `cargo run -p dkod-cli --bin dkod -- --mcp` against the wor
 ## Subagent
 
 - `parallel-executor` — orchestrates Task subagents per partition group; surfaces conflict events via `dkod_status`
-```
+````
 
 - [ ] **Step 4: Commit (docs-only, skip local CR).**
 

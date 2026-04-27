@@ -50,9 +50,18 @@ fn mcp_config_is_valid_json_and_declares_dkod_swarm_server() {
     let path = workspace_root().join("plugin/.mcp.json");
     let text = std::fs::read_to_string(&path).expect("read .mcp.json");
     let parsed: serde_json::Value = serde_json::from_str(&text).expect("parse JSON");
-    let servers = parsed["mcpServers"].as_object().expect("mcpServers map");
+    let server = &parsed["mcpServers"]["dkod-swarm"];
     assert!(
-        servers.contains_key("dkod-swarm"),
+        server.is_object(),
         "mcpServers must declare a `dkod-swarm` entry"
+    );
+    assert_eq!(
+        server["command"], "cargo",
+        "dkod-swarm MCP command must be `cargo` so CLAUDE_PLUGIN_ROOT/../Cargo.toml resolves"
+    );
+    let args = server["args"].as_array().expect("dkod-swarm args array");
+    assert!(
+        args.iter().any(|v| v == "--mcp"),
+        "dkod-swarm args must pass `--mcp` so dkod-cli enters stdio MCP mode"
     );
 }
