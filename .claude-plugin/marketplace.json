@@ -1,0 +1,20 @@
+{
+  "name": "dkod-swarm",
+  "description": "Local-first parallel AI coding agents — N agents, same files, one PR. AST-level symbol partitioning runs entirely on the user's machine; no platform, no API, no network coordination.",
+  "owner": {
+    "name": "Haim Ari",
+    "email": "haimari1@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "dkod-swarm",
+      "description": "Parallel agent execution against a single git worktree using AST-level symbol partitioning. Two agents safely rewrite different functions in the same file; merge happens in-place at write time, not at end-of-flow.",
+      "version": "0.4.0",
+      "source": "./plugin",
+      "author": {
+        "name": "Haim Ari",
+        "email": "haimari1@gmail.com"
+      }
+    }
+  ]
+}
