@@ -4,9 +4,17 @@
 //!
 //! This is the empirical evidence behind dkod-swarm's parallel-N-agents
 //! value proposition. Without the simulated delay, file I/O is too fast
-//! to show meaningful parallelism. With a 100ms-per-write delay,
-//! sequential = ~300ms, parallel = ~100ms. The test asserts a > 1.5×
-//! speedup with a safety margin for CI variance.
+//! to show meaningful parallelism.
+//!
+//! With a 100ms-per-write delay an idealised model predicts
+//! `serial ≈ 300ms`, `parallel ≈ 100ms` (a 3× ratio). The actual measurement
+//! lands closer to `serial ≈ 500ms`, `parallel ≈ 290ms` (~1.7×) because
+//! orchestrator overhead — `dkod_write_symbol`'s async tokio mutex,
+//! tree-sitter re-parse, the per-file lock acquire — adds non-trivial
+//! synchronization on top of the synthetic sleep on both arms. The
+//! asymmetry that matters (three sleeps overlapping vs three in
+//! sequence) is preserved, and the assertion (`> 1.5×`) holds with
+//! comfortable headroom across 5/5 stress runs locally.
 
 #[path = "common/mod.rs"]
 mod common;
@@ -21,13 +29,19 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
+/// Default per-write LLM-thinking delay. 100 ms is a realistic lower
+/// bound for an LLM Task-subagent step; large enough to dominate the
+/// orchestrator's intrinsic overhead so the parallel/serial ratio
+/// stays measurable on noisy CI hardware.
+const DEFAULT_LLM_DELAY_MS: u64 = 100;
+
 /// One simulated LLM-thinking delay per write. Tweak via env var
 /// `DKOD_BENCH_LLM_DELAY_MS` for local exploration; CI uses the default.
 fn llm_delay() -> Duration {
     let ms: u64 = std::env::var("DKOD_BENCH_LLM_DELAY_MS")
         .ok()
         .and_then(|s| s.parse().ok())
-        .unwrap_or(100);
+        .unwrap_or(DEFAULT_LLM_DELAY_MS);
     Duration::from_millis(ms)
 }
 
