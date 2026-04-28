@@ -44,9 +44,10 @@ end-to-end flow. They are not part of the dkod-swarm product. Building
 them on every `cargo test --workspace` run would slow the suite for
 zero correctness signal.
 
-If you want to build one standalone:
+If you want to build one standalone (each command is self-contained
+from the repo root — no `cd` needed):
 
 ```sh
-cd bench/sandboxes/auth    && cargo build
-cd bench/sandboxes/parsers && cargo build
+cargo build --manifest-path bench/sandboxes/auth/Cargo.toml
+cargo build --manifest-path bench/sandboxes/parsers/Cargo.toml
 ```

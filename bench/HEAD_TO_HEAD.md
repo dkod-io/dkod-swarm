@@ -52,10 +52,11 @@ gh repo create "haim-ari/dkod-bench-$NAME" \
 The two sessions must start from byte-identical scaffolds. Verify with:
 
 ```sh
-diff -r /tmp/dkod-bench-A /tmp/dkod-bench-B
+diff -r -x .git /tmp/dkod-bench-A /tmp/dkod-bench-B
 ```
 
-(Modulo `.git/`, the trees should be identical.)
+(`.git/` is excluded — the two repos share content but have distinct
+commit objects from the separate `git init` runs.)
 
 The dkod-swarm side has the plugin installed; the baseline side does
 not. Do not tell either Claude session about dkod-swarm — the prompt
@@ -108,7 +109,7 @@ Open Claude Code in `/tmp/dkod-bench-A` (dkod-swarm-enabled) and
 >
 > At the end, print this BENCH_REPORT block exactly:
 >
-> ```
+> ```text
 > BENCH_REPORT
 > ============
 > PR URL:                 <url>
