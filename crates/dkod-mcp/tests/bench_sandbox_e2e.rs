@@ -35,9 +35,18 @@ impl PathGuard {
     fn install(prefix: &Path) -> Self {
         let saved = std::env::var_os("PATH");
         let saved_str = saved.as_deref().and_then(|p| p.to_str()).unwrap_or("");
-        let new_path = format!("{}:{}", prefix.display(), saved_str);
+        // Avoid emitting a trailing `:` when the inherited PATH is empty
+        // — POSIX treats an empty path component as the current
+        // directory, which can mask shimmed binaries with whatever
+        // happens to be in `cwd`.
+        let new_path = if saved_str.is_empty() {
+            prefix.display().to_string()
+        } else {
+            format!("{}:{}", prefix.display(), saved_str)
+        };
         // SAFETY: `bench_sandbox_e2e` is the only test in this binary;
         // no sibling test races on PATH. Drop restores on every exit.
+        // `set_var` is `unsafe` in Rust 2024 edition.
         unsafe { std::env::set_var("PATH", new_path) };
         Self { saved }
     }
@@ -150,12 +159,20 @@ fn seed_auth_sandbox(root: &Path) {
     let src = workspace_root.join(SANDBOX_REL);
 
     // Copy every file in the sandbox into `root/`, preserving structure.
+    // Skip build / VCS artifacts so a contributor who ran
+    // `cd bench/sandboxes/auth && cargo build` locally does not pollute
+    // the test repo with a `target/` tree (slow, nondeterministic, and
+    // would defeat `git add -A` invariants).
     fn copy_dir(src: &Path, dst: &Path) {
         std::fs::create_dir_all(dst).unwrap();
         for entry in std::fs::read_dir(src).unwrap() {
             let entry = entry.unwrap();
+            let name = entry.file_name();
+            if matches!(name.to_str(), Some("target" | ".git")) {
+                continue;
+            }
             let from = entry.path();
-            let to = dst.join(entry.file_name());
+            let to = dst.join(&name);
             if from.is_dir() {
                 copy_dir(&from, &to);
             } else {
