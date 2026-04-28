@@ -8,8 +8,14 @@ Benchmarking and end-to-end fixtures for dkod-swarm.
   passkey) used by both the automated E2E tests and the manual
   driving guide. Not a workspace member; never built by
   `cargo build --workspace`.
+- `sandboxes/parsers/` — an 8-parser Rust crate with stub bodies and
+  paired `mod tests` stubs in a single `src/lib.rs`. Used as the
+  starting state for the head-to-head benchmark. Not a workspace
+  member; never built by `cargo build --workspace`.
 - `MANUAL_E2E.md` — step-by-step guide for driving the auth sandbox
   end-to-end through real Claude Code with the dkod-swarm plugin.
+- `HEAD_TO_HEAD.md` — driving guide for the dkod-swarm-vs-baseline
+  head-to-head benchmark using the parsers sandbox.
 
 ## Automated counterparts
 
@@ -30,16 +36,18 @@ cargo test -p dkod-mcp --test bench_sandbox_e2e
 cargo test -p dkod-mcp --test bench_parallel_vs_serial -- --nocapture
 ```
 
-## Why a sandbox crate that isn't built by the workspace
+## Why sandbox crates that aren't built by the workspace
 
-The auth sandbox is *fixture content* — files dkod-swarm reads in
-order to exercise the partitioner, the AST-merge primitive, and the
-end-to-end flow. It's not part of the dkod-swarm product. Building it
-on every `cargo test --workspace` run would slow the suite for zero
-correctness signal.
+The sandboxes are *fixture content* — files dkod-swarm reads to
+exercise the partitioner, the AST-merge primitive, and the end-to-end
+flow. They are not part of the dkod-swarm product. Building
+them on every `cargo test --workspace` run would slow the suite for
+zero correctness signal.
 
-If you want to build it standalone:
+If you want to build one standalone (each command is self-contained
+from the repo root — no `cd` needed):
 
 ```sh
-cd bench/sandboxes/auth && cargo build
+cargo build --manifest-path bench/sandboxes/auth/Cargo.toml
+cargo build --manifest-path bench/sandboxes/parsers/Cargo.toml
 ```

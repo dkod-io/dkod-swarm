@@ -1,0 +1,18 @@
+[package]
+name = "text-parsers-sandbox"
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+# This crate is a fixture — it is the starting state copied into both Claude
+# Code sessions of the dkod-swarm-vs-baseline head-to-head benchmark
+# (see ../../HEAD_TO_HEAD.md). It is NEVER built by the dkod-swarm
+# workspace and is therefore not listed in the workspace `members`.
+# Standalone build:
+#   cd bench/sandboxes/parsers && cargo build
+#
+# The empty [workspace] table below makes Cargo treat this crate as the
+# root of its own (one-crate) workspace, so a standalone `cargo build`
+# does not try to join the parent dkod-swarm workspace.
+[workspace]
