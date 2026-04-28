@@ -31,9 +31,9 @@
 
 ## Status
 
-**v0 in flight — milestones 1, 2, and 3 merged.** `cargo test --workspace` is green across 8 PRs of M1, 8 PRs of M2, and 3 PRs of M3.
+**v0 in flight — milestones 1, 2, 3, 4, and 5 merged.** `cargo test --workspace` is green across 8 PRs of M1, 8 of M2, 3 of M3, 3 of M4, and 3 of M5. Empirical proof of the parallel-vs-serial speedup lives in `crates/dkod-mcp/tests/bench_parallel_vs_serial.rs`; a human-driven counterpart is documented in `bench/MANUAL_E2E.md`.
 
-The full design lives in [`docs/design.md`](docs/design.md). Milestones 4+ (plugin manifest + skill, real-Rust-sandbox smoke test, marketplace publish) are the remaining ship items.
+The full design lives in [`docs/design.md`](docs/design.md). Milestone 6 (marketplace publish — replaces the `cargo run`-based `.mcp.json` with binary distribution) is the remaining ship item.
 
 <br>
 
