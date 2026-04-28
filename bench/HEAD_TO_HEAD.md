@@ -29,6 +29,9 @@ advantage:
 
 ## Setup — run identically for each session
 
+Run these commands from the `dkod-swarm` repo root so the relative
+`bench/sandboxes/parsers` path resolves:
+
 ```sh
 # Pick A or B per session; do this twice (once in each terminal).
 NAME=A   # change to B for the other terminal
@@ -90,7 +93,8 @@ Open Claude Code in `/tmp/dkod-bench-A` (dkod-swarm-enabled) and
 > 2. `cargo test` must pass.
 > 3. Use ONLY `std`. Do not edit `Cargo.toml` to add dependencies.
 > 4. Do NOT change function signatures, doc-comments, or test names.
-> 5. Do NOT add new files or new modules. Everything stays in `src/lib.rs`.
+> 5. All implementation and tests must stay in `src/lib.rs` — no new
+>    files, no new modules.
 > 6. Open a PR titled `Implement text-parsers` via `gh pr create`. The
 >    body lists each parser with one sentence on its implementation and
 >    one sentence on what its tests cover.

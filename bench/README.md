@@ -38,9 +38,9 @@ cargo test -p dkod-mcp --test bench_parallel_vs_serial -- --nocapture
 
 ## Why sandbox crates that aren't built by the workspace
 
-The sandboxes are *fixture content* — files dkod-swarm reads in
-order to exercise the partitioner, the AST-merge primitive, and the
-end-to-end flow. They are not part of the dkod-swarm product. Building
+The sandboxes are *fixture content* — files dkod-swarm reads to
+exercise the partitioner, the AST-merge primitive, and the end-to-end
+flow. They are not part of the dkod-swarm product. Building
 them on every `cargo test --workspace` run would slow the suite for
 zero correctness signal.
 
