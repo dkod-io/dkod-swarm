@@ -86,17 +86,25 @@ exit 99
 /// short-circuited (no real remote); everything else forwards to the
 /// real binary via the absolute path resolved at shim-creation time so
 /// the shim can never recurse into itself.
-fn install_git_shim(bin_dir: &Path) {
+///
+/// Each `git push` call appends a line to `bin_dir/.git_push_calls`
+/// so the test can assert post-flow that `dkod_pr` actually invoked
+/// `git push` instead of silently short-circuiting earlier. Returns
+/// the path of that marker file.
+fn install_git_shim(bin_dir: &Path) -> PathBuf {
     let real_git = which_git();
     let shim = bin_dir.join("git");
+    let marker = bin_dir.join(".git_push_calls");
     let body = format!(
         r#"#!/bin/sh
 if [ "$1" = "push" ]; then
+    echo "push $*" >> {marker_q}
     exit 0
 fi
 exec {real} "$@"
 "#,
         real = shell_quote(&real_git),
+        marker_q = shell_quote(&marker.display().to_string()),
     );
     std::fs::write(&shim, body).unwrap();
     #[cfg(unix)]
@@ -106,6 +114,7 @@ exec {real} "$@"
         perm.set_mode(0o755);
         std::fs::set_permissions(&shim, perm).unwrap();
     }
+    marker
 }
 
 fn which_git() -> String {
@@ -214,7 +223,7 @@ async fn auth_sandbox_full_plan_to_pr() {
     seed_auth_sandbox(&root);
 
     let bin_dir = make_gh_shim(&root, "https://github.com/fake/auth-sandbox/pull/1");
-    install_git_shim(&bin_dir);
+    let git_push_marker = install_git_shim(&bin_dir);
     let _path_guard = PathGuard::install(&bin_dir);
 
     let client = spawn_in_process_server(&root).await;
@@ -392,6 +401,22 @@ async fn auth_sandbox_full_plan_to_pr() {
     .await;
     let url = pr["url"].as_str().expect("pr.url string");
     assert!(url.contains("/pull/"), "expected /pull/ URL, got {url:?}");
+
+    // Confirm `dkod_pr` actually drove `git push` via the shim — the
+    // shim writes a line to `git_push_marker` for each push call.
+    // Without this assertion, a bug that silently skipped push (e.g.
+    // a regression in `gh::push_branch`) would still let the test
+    // pass via the gh shim's pr-create echo.
+    let push_log = std::fs::read_to_string(&git_push_marker).unwrap_or_else(|e| {
+        panic!(
+            "expected git push marker at {}: {e}",
+            git_push_marker.display()
+        )
+    });
+    assert!(
+        push_log.lines().any(|l| l.starts_with("push ")),
+        "git_push_marker has no `push ...` line: {push_log:?}"
+    );
 
     client.cancel().await.ok();
     drop(_path_guard);

@@ -811,9 +811,9 @@ git commit -m "Bench: assert parallel writes > 1.5x faster than serial"
 
 This is a docs-only file describing how to take the auth sandbox from `dkod init` through `/dkod-swarm:execute "..."` through `/dkod-swarm:pr` using a real Claude Code session. The automated tests in M5-1 / M5-2 prove correctness + parallelism mechanically; this guide proves the LLM-driven flow works end-to-end with human eyes.
 
-- [ ] **Step 1: Write `bench/MANUAL_E2E.md`.**
+- [ ] **Step 1: Write `bench/MANUAL_E2E.md`.** (Outer fence is four backticks because the body contains nested triple-backtick `sh` / `text` blocks.)
 
-```markdown
+````markdown
 # Manual end-to-end against the auth sandbox
 
 The automated tests in `crates/dkod-mcp/tests/bench_sandbox_e2e.rs` and
@@ -914,7 +914,7 @@ rm -rf /tmp/auth-sandbox
 This guide is intentionally not executable in CI — it requires a real
 Claude Code session and real LLM round-trips. Treat it as the
 human-in-the-loop counterpart to the automated tests.
-```
+````
 
 - [ ] **Step 2: Commit (docs-only, skip local CR).**
 
@@ -932,9 +932,9 @@ git commit -m "Add manual E2E driving guide for auth sandbox"
 - Create: `bench/README.md`
 - Modify: `README.md`
 
-- [ ] **Step 1: Create `bench/README.md`.**
+- [ ] **Step 1: Create `bench/README.md`.** (Outer fence is four backticks because the body contains nested triple-backtick `sh` blocks.)
 
-```markdown
+````markdown
 # bench/
 
 Benchmarking and end-to-end fixtures for dkod-swarm.
@@ -980,7 +980,7 @@ If you want to build it standalone:
 ```sh
 cd bench/sandboxes/auth && cargo build
 ```
-```
+````
 
 - [ ] **Step 2: Update the repo `README.md` Status section.**
 
