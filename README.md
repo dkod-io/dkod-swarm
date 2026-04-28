@@ -49,7 +49,7 @@ cargo run -p dkod-cli --bin dkod -- --mcp   # stdio MCP server (Claude Code expe
 
 `dkod init` writes `.dkod/config.toml`. `dkod status` prints a JSON snapshot of the
 current session. `dkod abort` destroys an active dk-branch. `dkod --mcp` is the
-stdio entry the Claude Code plugin will use once M4's plugin manifest lands.
+stdio entry the Claude Code plugin uses (the plugin manifest landed in M4).
 
 <br>
 

@@ -21,6 +21,10 @@ the loop.
    cp -R bench/sandboxes/auth /tmp/auth-sandbox
    cd /tmp/auth-sandbox
    git init -q -b main
+   # Configure a local git identity so the seed commit doesn't abort
+   # on machines without a global user.name/user.email.
+   git config user.name "dkod-swarm sandbox"
+   git config user.email "sandbox@example.invalid"
    git add -A
    git commit -q -m "seed auth sandbox"
    ```
