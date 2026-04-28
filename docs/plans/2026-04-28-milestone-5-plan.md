@@ -264,7 +264,7 @@ The test mirrors the M2-8 `e2e_smoke.rs` pattern: copy the sandbox into a tempdi
 mod common;
 use common::{init_tempo_repo, spawn_in_process_server};
 
-use rmcp::model::CallToolRequestParam;
+use rmcp::model::CallToolRequestParams;
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -376,7 +376,7 @@ fn seed_auth_sandbox(root: &Path) {
         .current_dir(root)
         .status()
         .unwrap();
-    assert!(s.status.success() || s.success(), "git add failed");
+    assert!(s.success(), "git add failed");
     let s = std::process::Command::new("git")
         .args(["commit", "-q", "--amend", "--no-edit", "--allow-empty"])
         .current_dir(root)
@@ -399,7 +399,7 @@ async fn call_tool_json(
 ) -> Value {
     let obj = args.as_object().cloned().unwrap_or_default();
     let result = client
-        .call_tool(CallToolRequestParam::new(name).with_arguments(obj))
+        .call_tool(CallToolRequestParams::new(name).with_arguments(obj))
         .await
         .expect("call_tool");
     for c in result.content {
