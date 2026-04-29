@@ -87,7 +87,7 @@ For each group in the partition, dispatch a Task subagent. Use the `parallel-exe
 
 1. The full set of symbol qualified names in its group
 2. The agent's specific task — derived from the user's overall task by scoping to those symbols
-3. Explicit instruction: **"For every file listed in your symbol set, you MUST use `dkod_write_symbol(group_id, file, qualified_name, new_body)` for the edit. The `new_body` is the full replacement item including its leading `///` outer doc-comments and `#[…]` single-line outer attributes — write each prefix line exactly once. DO NOT use raw `Edit` or `Write` on those files. Raw `Edit` / `Write` is only acceptable for files that are NOT in any partition group (e.g., a genuinely new file you're creating)."**
+3. Explicit instruction: **"For every file listed in your symbol set, you MUST use `dkod_write_symbol(group_id, file, qualified_name, new_body)` for the edit. The `new_body` is the full replacement item including its leading `///` outer doc-comments and `#[…]` single-line outer attributes — write each prefix line exactly once. Multi-line `#[…]` attributes (`#[cfg_attr(\n  …\n)]`) and `/** … */` block doc-comments are a v1 limit — for those, write `new_body` *without* them and the engine span replaces only the body. DO NOT use raw `Edit` or `Write` on those files. Raw `Edit` / `Write` is only acceptable for files that are NOT in any partition group (e.g., a genuinely new file you're creating)."**
 4. The `group_id` from the partition response — the subagent passes it to `dkod_write_symbol` and to the final `dkod_execute_complete` call.
 5. Instruction to call `dkod_execute_complete(group_id, summary)` when done, where `summary` is a one-paragraph description of what changed.
 

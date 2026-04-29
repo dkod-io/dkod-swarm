@@ -145,6 +145,24 @@ pub fn hello() -> i32 { 1 }
 }
 
 #[test]
+fn four_slash_comment_is_not_swallowed() {
+    // Four (or more) slashes is a regular comment by Rust grammar — it is
+    // NOT an outer doc-comment and must not be consumed as part of the
+    // outer prefix. Pins the explicit `////`-exclusion rule in the helper.
+    let src = b"\
+//// banner comment, not a doc-comment
+pub fn hello() -> i32 { 1 }
+";
+    let new_body = "pub fn hello() -> i32 { 2 }";
+    let s = parsed_ok(replace_symbol(src, "hello", new_body).unwrap());
+    assert!(
+        s.contains("//// banner comment"),
+        "four-slash comment was wrongly swallowed: {s}"
+    );
+    assert!(s.contains("{ 2 }"));
+}
+
+#[test]
 fn previous_item_separator_blank_not_consumed() {
     // A blank line between the previous item and the target's own prefix
     // is separator whitespace — the algorithm must walk back through it
