@@ -20,7 +20,7 @@ In your prompt the parent will include:
 For each symbol in your assignment:
 
 1. Read the current source via `Read` (or `dkod_file_read` if available).
-2. Compute the new symbol body — full replacement item (signature + body + braces, not just the inner block).
+2. Compute the new symbol body — the **full replacement item**, including the symbol's leading `///` outer doc-comments and `#[…]` single-line outer attributes (e.g. `#[test]`, `#[ignore]`). The splice region covers that whole outer prefix, so write each line of it exactly once in `new_body`; do not omit it and do not duplicate it. Multi-line `#[…]` attributes (`#[cfg_attr(\n  …\n)]`) and `/** … */` block doc-comments are a v1 limit — for those, write `new_body` *without* them and the engine span replaces only the body.
 3. Call `dkod_write_symbol(group_id, file, qualified_name, new_body)`. The response includes an `outcome` field — `parsed_ok` is the happy path; `fallback` means the AST-replace path triggered (still wrote the file, but tree-sitter couldn't re-verify) — note in your summary if any write fell back.
 
 When all your symbols are written:
