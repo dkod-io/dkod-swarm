@@ -163,6 +163,76 @@ pub fn hello() -> i32 { 1 }
 }
 
 #[test]
+fn indented_outer_attr_inside_mod_is_not_duplicated() {
+    // The bench fixture surfaced this: test functions live inside
+    // `mod tests` and are indented. The engine's `start_byte` for the
+    // function points at `fn`, which is NOT column 0 — the bytes
+    // immediately before are the indentation spaces. Earlier versions
+    // of `expand_outer_prefix_span` required `source[start - 1] == '\n'`,
+    // which is false for indented symbols, so the helper bailed and the
+    // splice missed the `#[test]` line above. Pin the contract: leading
+    // whitespace before `start_byte` is treated as the symbol's own
+    // indentation, the line above (its `#[test]`) is correctly swallowed,
+    // and the splice replaces both atomically.
+    let src = b"\
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn t() { assert!(false); }
+}
+";
+    // Note: avoid the `"\\\n    "` escape pattern — Rust eats the newline AND
+    // the leading whitespace, which would defeat the test by stripping the
+    // intended indentation from `new_body`. Use explicit `\n` instead.
+    let new_body = "    #[test]\n    fn t() { assert!(true); }";
+    let s = parsed_ok(replace_symbol(src, "t", new_body).unwrap());
+    // Function's own #[test] must appear exactly once and at the expected
+    // column 4. The mod-level `#[cfg(test)]` is unrelated and contains
+    // `(test)`, not `[test]`, so it does not match the substring.
+    assert_eq!(
+        s.matches("    #[test]").count(),
+        1,
+        "indented #[test] duplicated or mis-indented: {s}"
+    );
+    assert_eq!(
+        s.matches("#[test]").count(),
+        1,
+        "got more than one #[test] line in: {s}"
+    );
+    assert!(s.contains("assert!(true)"));
+    assert!(!s.contains("assert!(false)"));
+}
+
+#[test]
+fn indented_doc_and_attr_stacked_each_appear_once() {
+    // Same as `doc_and_attr_stacked_each_appear_once` but the symbol is
+    // nested inside a `mod` and therefore indented.
+    let src = b"\
+mod inner {
+    /// docs
+    #[test]
+    fn t() { assert!(false); }
+}
+";
+    let new_body = "    /// docs\n    #[test]\n    fn t() { assert!(true); }";
+    let s = parsed_ok(replace_symbol(src, "t", new_body).unwrap());
+    assert_eq!(
+        s.matches("    /// docs").count(),
+        1,
+        "indented doc duplicated or mis-indented: {s}"
+    );
+    assert_eq!(
+        s.matches("    #[test]").count(),
+        1,
+        "indented #[test] duplicated or mis-indented: {s}"
+    );
+    assert!(s.contains("assert!(true)"));
+    assert!(!s.contains("assert!(false)"));
+}
+
+#[test]
 fn previous_item_separator_blank_not_consumed() {
     // A blank line between the previous item and the target's own prefix
     // is separator whitespace — the algorithm must walk back through it
