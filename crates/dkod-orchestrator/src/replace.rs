@@ -176,21 +176,37 @@ pub fn replace_symbol(
 /// place rather than duplicating them.
 ///
 /// See the module-level docs for the full set of rules and v1 limits.
-/// Mid-line symbol starts (rare in idiomatic Rust source) are returned
-/// unchanged — expansion would otherwise walk into a sibling symbol on
-/// the same physical line.
+/// Mid-line symbol starts (rare in idiomatic Rust source — e.g.
+/// `fn foo() {} fn bar() {}` on one line) are returned unchanged so
+/// expansion does not walk into a sibling symbol on the same physical
+/// line. A symbol whose `start_byte` points past its leading
+/// whitespace (e.g. `fn t()` inside an indented `mod tests` block) is
+/// still treated as line-start: the indentation between the previous
+/// newline and `start_byte` is part of the symbol's own line.
 fn expand_outer_prefix_span(source: &[u8], symbol_start: usize) -> usize {
     if symbol_start > source.len() {
         return symbol_start;
     }
-    // Only expand when the symbol begins at a line boundary. Mid-line
-    // starts are left alone (see fn-doc).
-    let at_line_start = symbol_start == 0 || source[symbol_start - 1] == b'\n';
-    if !at_line_start {
+    // The line containing `symbol_start` begins at the byte right after
+    // the previous newline (or 0 at file start).
+    let line_start_of_symbol = source[..symbol_start]
+        .iter()
+        .rposition(|&b| b == b'\n')
+        .map(|p| p + 1)
+        .unwrap_or(0);
+    // Only expand when everything between `line_start_of_symbol` and
+    // `symbol_start` is leading whitespace (the symbol's own
+    // indentation). If anything else sits there — e.g. a sibling symbol
+    // on the same physical line — the symbol is mid-line and we must
+    // leave the span alone.
+    let lead_is_whitespace = source[line_start_of_symbol..symbol_start]
+        .iter()
+        .all(|&b| b == b' ' || b == b'\t');
+    if !lead_is_whitespace {
         return symbol_start;
     }
 
-    let mut cursor = symbol_start;
+    let mut cursor = line_start_of_symbol;
 
     // Walk backward. After each iteration `cursor` is at the start of
     // either an outer-prefix line (which we have just absorbed) or the
@@ -232,16 +248,19 @@ fn expand_outer_prefix_span(source: &[u8], symbol_start: usize) -> usize {
     // newline into the previous item's territory or (worse) force the
     // caller's `new_body` to reproduce the gap. Stop at the first
     // non-blank line — that line is the real start of the outer prefix.
-    while cursor < symbol_start {
-        let line_end = source[cursor..symbol_start]
+    // Forward-trim stops at `line_start_of_symbol`, never past it: the
+    // symbol's own line is the splice's right-hand boundary on the
+    // start side.
+    while cursor < line_start_of_symbol {
+        let line_end = source[cursor..line_start_of_symbol]
             .iter()
             .position(|&b| b == b'\n')
             .map(|offset| cursor + offset)
-            .unwrap_or(symbol_start);
+            .unwrap_or(line_start_of_symbol);
         let line = &source[cursor..line_end];
         if line.trim_ascii_start().is_empty() {
             // Advance past this blank line and its terminating newline.
-            cursor = (line_end + 1).min(symbol_start);
+            cursor = (line_end + 1).min(line_start_of_symbol);
         } else {
             break;
         }
